@@ -24,36 +24,34 @@ def get_flip_positions_by_row_column(board, row, column, row_add, column_add):
 
     return position_nums
 
-def put_black(board, position_num):
+def get_flip_positions(board, position_num):
+    position_nums = []
+
+    if not (position_num >= 0 and position_num <= 63):
+        return position_nums
+    if board[position_num] != 0:
+        return position_nums
+
     column = position_num % 8
     row    = int((position_num - column) / 8)
 
     row_column_adds = ((0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1))
-
-    board[position_num] = 1
     for row_add, column_add in row_column_adds:
-        position_nums = get_flip_positions_by_row_column(board, row, column, row_add, column_add)
-        for position_num in position_nums:
-            board[position_num] = 1
+        position_nums.extend(get_flip_positions_by_row_column(board, row, column, row_add, column_add))
 
+    return position_nums
+
+def put_black(board, position_num):
+    position_nums = get_flip_positions(board, position_num)
+    if len(position_nums) > 0:
+        board[position_num] = 1
+        for position_num in get_flip_positions(board, position_num):
+            board[position_num] = 1
     return board
 
 def is_putable_position_num(board, position_num):
-    if not (position_num >= 0 and position_num <= 63):
-        return False
-    if board[position_num] != 0:
-        return False
-
-    column = position_num % 8
-    row    = int((position_num - column) / 8)
-
-    row_column_adds = ((0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1))
-    for row_add, column_add in row_column_adds:
-        position_nums = get_flip_positions_by_row_column(board, row, column, row_add, column_add)
-        if len(position_nums) != 0:
-            return True
-
-    return False
+    position_nums = get_flip_positions(board, position_num)
+    return len(position_nums) != 0
 
 def get_putable_position_nums(board):
     return [num for num in range(64) if is_putable_position_num(board, num)]
