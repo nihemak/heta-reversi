@@ -50,7 +50,18 @@ def get_flip_positions(board, is_black, position_num):
 
     return position_nums
 
-def put(board, is_black, position_num):
+def is_putable_position_num(board, is_black, position_num):
+    position_nums = get_flip_positions(board, is_black, position_num)
+    return len(position_nums) != 0
+
+def get_putable_position_nums(board, is_black):
+    return [num for num in range(64) if is_putable_position_num(board, is_black, num)]
+
+def get_player(board, is_black = True):
+    return (board, is_black, get_putable_position_nums(board, is_black))
+
+def put(player, position_num):
+    board, is_black, _ = player
     own = 1 if is_black else -1
     position_nums = get_flip_positions(board, is_black, position_num)
     if len(position_nums) > 0:
@@ -59,42 +70,38 @@ def put(board, is_black, position_num):
             board[position_num] = own
     return board
 
-def is_putable_position_num(board, is_black, position_num):
-    position_nums = get_flip_positions(board, is_black, position_num)
-    return len(position_nums) != 0
+def is_putable(player):
+    _, _, putable_position_nums = player
+    return len(putable_position_nums) > 0
 
-def get_putable_position_nums(board, is_black):
-    return [num for num in range(64) if is_putable_position_num(board, is_black, num)]
-
-def is_putable(board, is_black):
-    return len(get_putable_position_nums(board, is_black)) > 0
-
-def render_board(board, is_black):
+def render_board(player):
+    board, is_black, putable_position_nums = player
     black, white = "○", "●"  # 1, -1
     display_board = [i if v == 0 else " {} ".format(black if v == 1 else white) for i, v in enumerate(board)]
     row = " {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} "
     hr = "\n------------------------------------------------\n"
     layout = row + hr + row + hr + row + hr + row + hr + row + hr + row + hr + row + hr + row
     print((layout).format(*display_board))
-    print("{}: putable position numbers are {}".format(black if is_black else white, get_putable_position_nums(board, is_black)))
+    print("{}: putable position numbers are {}".format(black if is_black else white, putable_position_nums))
 
-def is_end(board):
-    return not (is_putable(board, True) or is_putable(board, False))
+def is_end(player):
+    board, is_black, _ = player
+    return not (is_putable(player) or is_putable(get_player(board, not is_black)))
 
 def main():
-    board = get_init_board()
-
-    is_black = True
-    while not is_end(board):
-        render_board(board, is_black)
-        if is_putable(board, is_black):
-            position_num = np.random.choice(get_putable_position_nums(board, is_black))
+    player = get_player(get_init_board())
+    while True:
+        board, is_black, putable_position_nums = player
+        render_board(player)
+        if is_end(player):
+            break
+        if is_putable(player):
+            position_num = np.random.choice(putable_position_nums)
             print(position_num)
-            board = put(board, is_black, position_num)
+            board = put(player, position_num)
         else:
             print("pass")
-        is_black = not is_black
-    render_board(board, is_black)
+        player = get_player(board, not is_black)
 
 if __name__ == "__main__":
     main()
