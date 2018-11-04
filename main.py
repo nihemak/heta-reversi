@@ -60,8 +60,12 @@ def get_putable_position_nums(board, is_black):
 def get_player(board, is_black = True):
     return (board, is_black, get_putable_position_nums(board, is_black))
 
+def is_end_board(board):
+    return len(np.where(board == 0)[0]) == 0
+
 def put(player, position_num):
     board, is_black, _ = player
+    board = board.copy()
     own = 1 if is_black else -1
     position_nums = get_flip_positions(board, is_black, position_num)
     if len(position_nums) > 0:
@@ -84,23 +88,32 @@ def render_board(player):
     print((layout).format(*display_board))
     print("{}: putable position numbers are {}".format(black if is_black else white, putable_position_nums))
 
-def is_end(player):
-    board, is_black, _ = player
-    return not (is_putable(player) or is_putable(get_player(board, not is_black)))
+def is_pass_last_put(game):
+    if len(game) == 0:
+        return False
+    _, position_num = game[-1]
+    return position_num == None
+
+def is_end_game(game, player):
+    board, _, _ = player
+    return is_end_board(board) or (is_pass_last_put(game) and not is_putable(player))
 
 def main():
+    game = []
     player = get_player(get_init_board())
     while True:
         board, is_black, putable_position_nums = player
         render_board(player)
-        if is_end(player):
+        if is_end_game(game, player):
             break
+        position_num = None
         if is_putable(player):
             position_num = np.random.choice(putable_position_nums)
             print(position_num)
             board = put(player, position_num)
         else:
             print("pass")
+        game.append((player, position_num))
         player = get_player(board, not is_black)
 
 if __name__ == "__main__":
