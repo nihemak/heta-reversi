@@ -98,6 +98,23 @@ def is_end_game(game, player):
     board, _, _ = player
     return is_end_board(board) or (is_pass_last_put(game) and not is_putable(player))
 
+def choice_random(putable_position_nums):
+    return np.random.choice(putable_position_nums)
+
+def choice_human(putable_position_nums):
+    choice = None
+    while True:
+        try:
+            choice = input("Please enter number in {}: ".format(putable_position_nums))
+            choice = int(choice)
+            if choice in putable_position_nums:
+                break
+            else:
+                print("{} is invalid".format(choice))
+        except Exception:
+            print("{} is invalid".format(choice))
+    return choice
+
 def main():
     game = []
     player = get_player(get_init_board())
@@ -108,7 +125,10 @@ def main():
             break
         position_num = None
         if is_putable(player):
-            position_num = np.random.choice(putable_position_nums)
+            if is_black:
+                position_num = choice_human(putable_position_nums)
+            else:
+                position_num = choice_random(putable_position_nums)
             print(position_num)
             board = put(player, position_num)
         else:
