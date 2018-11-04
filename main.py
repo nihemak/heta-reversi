@@ -2,17 +2,20 @@
 
 import numpy as np
 
-def get_flip_positions_by_row_column(board, row, column, row_add, column_add):
+def get_flip_positions_by_row_column(board, is_black, row, column, row_add, column_add):
+    position_nums = []
+
+    own, pair = (1, -1) if is_black else (-1, 1)
+
     row    += row_add
     column += column_add
     exists = False
-    position_nums = []
     while row >= 0 and row < 8 and column >= 0 and column < 8:
         position_num = row * 8 + column
 
-        if exists == True and board[position_num] == 1:
+        if exists == True and board[position_num] == own:
             break
-        elif board[position_num] != -1:
+        if board[position_num] != pair:
             position_nums = []
             break
 
@@ -24,7 +27,7 @@ def get_flip_positions_by_row_column(board, row, column, row_add, column_add):
 
     return position_nums
 
-def get_flip_positions(board, position_num):
+def get_flip_positions(board, is_black, position_num):
     position_nums = []
 
     if not (position_num >= 0 and position_num <= 63):
@@ -37,44 +40,54 @@ def get_flip_positions(board, position_num):
 
     row_column_adds = ((0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1))
     for row_add, column_add in row_column_adds:
-        position_nums.extend(get_flip_positions_by_row_column(board, row, column, row_add, column_add))
+        position_nums.extend(get_flip_positions_by_row_column(board, is_black, row, column, row_add, column_add))
 
     return position_nums
 
-def put_black(board, position_num):
-    position_nums = get_flip_positions(board, position_num)
+def put(board, is_black, position_num):
+    own = 1 if is_black else -1
+    position_nums = get_flip_positions(board, is_black, position_num)
     if len(position_nums) > 0:
-        board[position_num] = 1
-        for position_num in get_flip_positions(board, position_num):
-            board[position_num] = 1
+        board[position_num] = own
+        for position_num in position_nums:
+            board[position_num] = own
     return board
 
-def is_putable_position_num(board, position_num):
-    position_nums = get_flip_positions(board, position_num)
+def is_putable_position_num(board, is_black, position_num):
+    position_nums = get_flip_positions(board, is_black, position_num)
     return len(position_nums) != 0
 
-def get_putable_position_nums(board):
-    return [num for num in range(64) if is_putable_position_num(board, num)]
+def get_putable_position_nums(board, is_black):
+    return [num for num in range(64) if is_putable_position_num(board, is_black, num)]
 
-def render_board(board_data):
-    black = "○"  # 1
-    white = "●"  # -1
-    board = [i if v == 0 else " {} ".format(black if v == 1 else white) for i, v in enumerate(board_data)]
+def render_board(board, is_black):
+    black, white = "○", "●"  # 1, -1
+    display_board = [i if v == 0 else " {} ".format(black if v == 1 else white) for i, v in enumerate(board)]
     row = " {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} "
     hr = "\n------------------------------------------------\n"
     layout = row + hr + row + hr + row + hr + row + hr + row + hr + row + hr + row + hr + row
-    print((layout).format(*board))
-    print("{}: putable position numbers are {}".format(black, get_putable_position_nums(board_data)))
+    print((layout).format(*display_board))
+    print("{}: putable position numbers are {}".format(black if is_black else white, get_putable_position_nums(board, is_black)))
 
 def main():
     board = np.array([0] * 64, dtype=np.float32)
     board[28] = board[35] = 1
     board[27] = board[36] = -1
-    render_board(board)
-    position_num = np.random.choice(get_putable_position_nums(board))
+
+    is_black = True
+    render_board(board, is_black)
+    position_num = np.random.choice(get_putable_position_nums(board, is_black))
     print(position_num)
-    board = put_black(board, position_num)
-    render_board(board)
+    board = put(board, is_black, position_num)
+
+    is_black = False
+    render_board(board, is_black)
+    position_num = np.random.choice(get_putable_position_nums(board, is_black))
+    print(position_num)
+    board = put(board, is_black, position_num)
+
+    is_black = True
+    render_board(board, is_black)
 
 if __name__ == "__main__":
     main()
