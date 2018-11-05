@@ -115,7 +115,7 @@ def choice_human(putable_position_nums):
             print("{} is invalid".format(choice))
     return choice
 
-def main():
+def game(choice_black, choice_white):
     game = []
     player = get_player(get_init_board())
     while True:
@@ -125,16 +125,18 @@ def main():
             break
         position_num = None
         if is_putable(player):
-            if is_black:
-                position_num = choice_human(putable_position_nums)
-            else:
-                position_num = choice_random(putable_position_nums)
+            choice = choice_black if is_black else choice_white
+            position_num = choice(putable_position_nums)
             print(position_num)
             board = put(player, position_num)
         else:
             print("pass")
         game.append((player, position_num))
         player = get_player(board, not is_black)
+    return game
+
+def main():
+    game(choice_human, choice_random)
 
 if __name__ == "__main__":
     main()
