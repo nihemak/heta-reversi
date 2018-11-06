@@ -63,6 +63,11 @@ def get_player(board, is_black = True):
 def is_end_board(board):
     return len(np.where(board == 0)[0]) == 0
 
+def get_stone_num(board):
+    black_num = len(np.where(board ==  1)[0])
+    white_num = len(np.where(board == -1)[0])
+    return black_num, white_num
+
 def put(player, position_num):
     board, is_black, _ = player
     board = board.copy()
@@ -81,11 +86,13 @@ def is_putable(player):
 def render_board(player):
     board, is_black, putable_position_nums = player
     black, white = "○", "●"  # 1, -1
+    black_num, white_num = get_stone_num(board)
     display_board = [i if v == 0 else " {} ".format(black if v == 1 else white) for i, v in enumerate(board)]
     row = " {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} "
     hr = "\n------------------------------------------------\n"
     layout = row + hr + row + hr + row + hr + row + hr + row + hr + row + hr + row + hr + row
     print((layout).format(*display_board))
+    print("{}:{} {}:{}".format(black, black_num, white, white_num))
     print("{}: putable position numbers are {}".format(black if is_black else white, putable_position_nums))
 
 def is_pass_last_put(game):
@@ -98,7 +105,24 @@ def is_end_game(game, player):
     board, _, _ = player
     return is_end_board(board) or (is_pass_last_put(game) and not is_putable(player))
 
-def main():
+def choice_random(putable_position_nums):
+    return np.random.choice(putable_position_nums)
+
+def choice_human(putable_position_nums):
+    choice = None
+    while True:
+        try:
+            choice = input("Please enter number in {}: ".format(putable_position_nums))
+            choice = int(choice)
+            if choice in putable_position_nums:
+                break
+            else:
+                print("{} is invalid".format(choice))
+        except Exception:
+            print("{} is invalid".format(choice))
+    return choice
+
+def game(choice_black, choice_white):
     game = []
     player = get_player(get_init_board())
     while True:
@@ -108,13 +132,18 @@ def main():
             break
         position_num = None
         if is_putable(player):
-            position_num = np.random.choice(putable_position_nums)
+            choice = choice_black if is_black else choice_white
+            position_num = choice(putable_position_nums)
             print(position_num)
             board = put(player, position_num)
         else:
             print("pass")
         game.append((player, position_num))
         player = get_player(board, not is_black)
+    return game
+
+def main():
+    game(choice_human, choice_random)
 
 if __name__ == "__main__":
     main()
