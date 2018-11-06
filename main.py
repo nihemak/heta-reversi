@@ -63,6 +63,11 @@ def get_player(board, is_black = True):
 def is_end_board(board):
     return len(np.where(board == 0)[0]) == 0
 
+def get_stone_num(board):
+    black_num = len(np.where(board ==  1)[0])
+    white_num = len(np.where(board == -1)[0])
+    return black_num, white_num
+
 def put(player, position_num):
     board, is_black, _ = player
     board = board.copy()
@@ -81,11 +86,13 @@ def is_putable(player):
 def render_board(player):
     board, is_black, putable_position_nums = player
     black, white = "○", "●"  # 1, -1
+    black_num, white_num = get_stone_num(board)
     display_board = [i if v == 0 else " {} ".format(black if v == 1 else white) for i, v in enumerate(board)]
     row = " {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} | {:>3} "
     hr = "\n------------------------------------------------\n"
     layout = row + hr + row + hr + row + hr + row + hr + row + hr + row + hr + row + hr + row
     print((layout).format(*display_board))
+    print("{}:{} {}:{}".format(black, black_num, white, white_num))
     print("{}: putable position numbers are {}".format(black if is_black else white, putable_position_nums))
 
 def is_pass_last_put(game):
