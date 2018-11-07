@@ -105,10 +105,12 @@ def is_end_game(game, player):
     board, _, _ = player
     return is_end_board(board) or (is_pass_last_put(game) and not is_putable(player))
 
-def choice_random(putable_position_nums):
+def choice_random(player):
+    _, _, putable_position_nums = player
     return np.random.choice(putable_position_nums)
 
-def choice_human(putable_position_nums):
+def choice_human(player):
+    _, _, putable_position_nums = player
     choice = None
     while True:
         try:
@@ -122,22 +124,27 @@ def choice_human(putable_position_nums):
             print("{} is invalid".format(choice))
     return choice
 
-def game(choice_black, choice_white):
+def game(choice_black, choice_white, board = None, is_render = True):
     game = []
-    player = get_player(get_init_board())
+    if board is None:
+        board = get_init_board()
+    player = get_player(board)
     while True:
-        board, is_black, putable_position_nums = player
-        render_board(player)
+        board, is_black, _ = player
+        if is_render:
+            render_board(player)
         if is_end_game(game, player):
             break
         position_num = None
         if is_putable(player):
             choice = choice_black if is_black else choice_white
-            position_num = choice(putable_position_nums)
-            print(position_num)
+            position_num = choice(player)
+            if is_render:
+                print(position_num)
             board = put(player, position_num)
         else:
-            print("pass")
+            if is_render:
+                print("pass")
         game.append((player, position_num))
         player = get_player(board, not is_black)
     return game
