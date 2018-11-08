@@ -79,6 +79,19 @@ def put(player, position_num):
             board[position_num] = own
     return board
 
+def playout(player, position_num):
+    is_win = False
+    _, is_black, _ = player
+    board = put(player, position_num)
+    puts = game(choice_random, choice_random, board, False)
+    if len(puts) > 0:
+        player_last, _ = puts[-1]
+        board_last, _, _ = player_last
+        black_num, white_num = get_stone_num(board_last)
+        if (is_black and black_num > white_num) or (not is_black and black_num < white_num):
+            is_win = True
+    return is_win
+
 def is_putable(player):
     _, _, putable_position_nums = player
     return len(putable_position_nums) > 0
@@ -108,6 +121,15 @@ def is_end_game(game, player):
 def choice_random(player):
     _, _, putable_position_nums = player
     return np.random.choice(putable_position_nums)
+
+def choice_primitive_monte_carlo(player, try_num = 150):
+    _, _, putable_position_nums = player
+    position_scores = np.zeros(len(putable_position_nums))
+    for _ in range(try_num):
+        playouts = [playout(player, position_num) for position_num in putable_position_nums]
+        position_scores += np.array([1 if is_win else 0 for is_win in playouts])
+    index = np.random.choice(np.where(position_scores == position_scores.max())[0])
+    return putable_position_nums[index]
 
 def choice_human(player):
     _, _, putable_position_nums = player
@@ -150,7 +172,7 @@ def game(choice_black, choice_white, board = None, is_render = True):
     return game
 
 def main():
-    game(choice_human, choice_random)
+    game(choice_human, choice_primitive_monte_carlo)
 
 if __name__ == "__main__":
     main()
