@@ -3,6 +3,8 @@
 import numpy as np
 import math
 import functools
+import csv
+import datetime
 
 def get_init_board():
     board = np.array([0] * 64, dtype=np.float32)
@@ -255,8 +257,19 @@ def game(choice_black, choice_white, board = None, is_render = True):
         player = get_player(board, not is_black)
     return game
 
+def save_playdata(steps):
+    position_nums = []
+    for step in steps:
+        _, position_num = step
+        position_nums.append(position_num if position_num is not None else -1)
+    filename = 'data/playdata_{}.csv'.format(datetime.date.today().strftime("%Y%m%d"))
+    with open(filename, 'a') as f:
+        writer = csv.writer(f, lineterminator='\n')
+        writer.writerow(position_nums)
+
 def main():
-    game(choice_human, ChoiceMonteCarloTreeSearch())
+    steps = game(choice_human, ChoiceMonteCarloTreeSearch())
+    save_playdata(steps)
 
 if __name__ == "__main__":
     main()
