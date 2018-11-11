@@ -1,6 +1,8 @@
 # coding: utf-8
 
 import numpy as np
+import math
+import functools
 
 def get_init_board():
     board = np.array([0] * 64, dtype=np.float32)
@@ -71,12 +73,13 @@ def get_stone_num(board):
 def put(player, position_num):
     board, is_black, _ = player
     board = board.copy()
-    own = 1 if is_black else -1
-    position_nums = get_flip_positions(board, is_black, position_num)
-    if len(position_nums) > 0:
-        board[position_num] = own
-        for position_num in position_nums:
+    if position_num is not None:
+        own = 1 if is_black else -1
+        position_nums = get_flip_positions(board, is_black, position_num)
+        if len(position_nums) > 0:
             board[position_num] = own
+            for position_num in position_nums:
+                board[position_num] = own
     return board
 
 def playout(player, position_num):
@@ -131,6 +134,87 @@ def choice_primitive_monte_carlo(player, try_num = 150):
     index = np.random.choice(np.where(position_scores == position_scores.max())[0])
     return putable_position_nums[index]
 
+class ChoiceMonteCarloTreeSearch:
+    def _get_node(self, player, position_num):
+        return {
+            'player': player,
+            'position_num': position_num,
+            'try_num': 0,
+            'win_num': 0,
+            'child_nodes': None
+        }
+
+    def _get_initial_nodes(self, player):
+        board, is_black, putable_position_nums = player
+        nodes = [self._get_node(get_player(put(player, position_num), not is_black), position_num) for position_num in putable_position_nums]
+        if len(putable_position_nums) == 0:
+            nodes = [self._get_node(get_player(board, not is_black), None)]
+        return nodes
+
+    def _get_ucb1(self, node, total_num):
+        return (node['win_num'] / node['try_num']) + math.sqrt(2 * math.log(total_num) / node['try_num'])
+
+    def _selection_node_index(self, nodes):
+        total_num = functools.reduce(lambda total_num, node: total_num + node['try_num'], nodes, 0)
+        ucb1s = np.array([self._get_ucb1(node, total_num) if node['try_num'] != 0 else -1 for node in nodes])
+        indexs = np.where(ucb1s == -1)[0]  # -1 is infinity
+        if len(indexs) == 0:
+            indexs = np.where(ucb1s == ucb1s.max())[0]
+        index = np.random.choice(indexs)
+        return index
+
+    def _selection_expansion(self, nodes, expansion_num):
+        game = []
+        node, path = None, []
+        target_nodes = nodes
+        while True:
+            index = self._selection_node_index(target_nodes)
+            path.append(index)
+            node = target_nodes[index]
+            if node['child_nodes'] is None:
+                if node['try_num'] >= expansion_num:
+                    if is_end_game(game, node['player']):
+                        break
+                    # expansion
+                    node['child_nodes'] = self._get_initial_nodes(node['player'])
+                else:
+                    break
+            target_nodes = node['child_nodes']
+            game.append((node['player'], node['position_num']))
+        return nodes, node, path
+
+    def _evaluation(self, node, is_black):
+        is_win = playout(node['player'], node['position_num'])
+        _, node_is_black, _ = node['player']
+        node_is_win = (is_black == node_is_black and is_win) or (is_black != node_is_black and not is_win)
+        return node_is_win
+
+    def _backup(self, nodes, path, is_win):
+        target_nodes = nodes
+        for index in path:
+            target_nodes[index]['try_num'] += 1
+            if is_win:
+                target_nodes[index]['win_num'] += 1
+            target_nodes = target_nodes[index]['child_nodes']
+        return nodes
+
+    def _choice_node_index(self, nodes):
+        try_nums = np.array([node['try_num'] for node in nodes])
+        indexs = np.where(try_nums == try_nums.max())[0]
+        index = np.random.choice(indexs)
+        return index
+
+    def __call__(self, player, try_num = 1500, expansion_num = 5):
+        _, is_black, _ = player
+        nodes = self._get_initial_nodes(player)
+        for _ in range(try_num):
+            nodes, node, path = self._selection_expansion(nodes, expansion_num)
+            is_win = self._evaluation(node, is_black)
+            nodes = self._backup(nodes, path, is_win)
+        index = self._choice_node_index(nodes)
+        choice = nodes[index]['position_num']
+        return choice
+
 def choice_human(player):
     _, _, putable_position_nums = player
     choice = None
@@ -172,7 +256,7 @@ def game(choice_black, choice_white, board = None, is_render = True):
     return game
 
 def main():
-    game(choice_human, choice_primitive_monte_carlo)
+    game(choice_human, ChoiceMonteCarloTreeSearch())
 
 if __name__ == "__main__":
     main()
