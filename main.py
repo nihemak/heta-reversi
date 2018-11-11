@@ -268,8 +268,9 @@ def save_playdata(steps):
         writer.writerow(position_nums)
 
 def main():
-    steps = game(choice_human, ChoiceMonteCarloTreeSearch())
-    save_playdata(steps)
+    while True:
+        steps = game(choice_human, ChoiceMonteCarloTreeSearch())
+        save_playdata(steps)
 
 if __name__ == "__main__":
     main()
