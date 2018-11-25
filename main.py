@@ -5,6 +5,7 @@ import math
 import functools
 import csv
 import datetime
+import sys
 
 def get_init_board():
     board = np.array([0] * 64, dtype=np.float32)
@@ -267,10 +268,14 @@ def save_playdata(steps):
         writer = csv.writer(f, lineterminator='\n')
         writer.writerow(position_nums)
 
-def main():
+def play():
     while True:
         steps = game(choice_human, ChoiceMonteCarloTreeSearch())
         save_playdata(steps)
 
 if __name__ == "__main__":
-    main()
+    args = sys.argv
+    if len(args) > 1 and args[1] == 'play':
+        play()
+    else:
+        print('Usage error: python main.py play', file=sys.stderr)
