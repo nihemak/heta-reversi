@@ -124,6 +124,24 @@ def is_end_game(game, player):
     board, _, _ = player
     return is_end_board(board) or (is_pass_last_put(game) and not is_putable(player))
 
+class ChoiceReplaySteps:
+    def __init__(self, steps):
+        self._i = 0
+        self._steps = steps
+
+    def __call__(self, player):
+        _, _, putable_position_nums = player
+        # skip -1
+        while True:
+            step = self._steps[self._i]
+            if step != -1:
+                break
+            self._i += 1
+        if step not in putable_position_nums:
+            step = np.random.choice(putable_position_nums)
+        self._i += 1
+        return step
+
 def choice_random(player):
     _, _, putable_position_nums = player
     return np.random.choice(putable_position_nums)
@@ -273,9 +291,21 @@ def play():
         steps = game(choice_human, ChoiceMonteCarloTreeSearch())
         save_playdata(steps)
 
+def replay(steps_list):
+    for steps in steps_list:
+        choice1 = ChoiceReplaySteps(np.array(steps, dtype=np.int32)[::2])
+        choice2 = ChoiceReplaySteps(np.array(steps, dtype=np.int32)[1::2])
+        game(choice1, choice2)
+
 if __name__ == "__main__":
     args = sys.argv
     if len(args) > 1 and args[1] == 'play':
         play()
+    elif len(args) > 2 and args[1] == 'replay':
+        with open(args[2], 'r') as f:
+            steps_list = csv.reader(f)
+            replay(steps_list)
     else:
-        print('Usage error: python main.py play', file=sys.stderr)
+        print('Usage error:', file=sys.stderr)
+        print(' - python main.py play', file=sys.stderr)
+        print(' - python main.py replay filepath-playdata', file=sys.stderr)
