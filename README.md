@@ -6,13 +6,13 @@ $ docker-compose exec python3 bash
 * play
 
 ```bash
-$ python main.py play
+$ export PYTHONIOENCODING=utf-8; python3 main.py play
 ```
 
 * replay play data
 
 ```bash
-$ python main.py replay data/playdata_xxxxxxxx.csv
+$ export PYTHONIOENCODING=utf-8; python3 main.py replay data/playdata_xxxxxxxx.csv
 ```
 
 ```bash
