@@ -6,6 +6,7 @@ import functools
 import csv
 import datetime
 import sys
+import chainer
 
 def get_init_board():
     board = np.array([0] * 64, dtype=np.float32)
