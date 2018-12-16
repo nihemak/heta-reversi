@@ -308,6 +308,10 @@ class ChoiceSupervisedLearningPolicyNetwork:
         choice = putable_position_nums[index]
         return choice
 
+def choice_asynchronous_policy_and_value_monte_carlo_tree_search(player):
+    _, _, putable_position_nums = player
+    return np.random.choice(putable_position_nums)
+
 def choice_human(player):
     _, _, putable_position_nums = player
     choice = None
@@ -360,7 +364,7 @@ def save_playdata(steps):
 
 def play():
     while True:
-        steps = game(choice_human, ChoiceSupervisedLearningPolicyNetwork(DualNet()))
+        steps = game(choice_human, choice_asynchronous_policy_and_value_monte_carlo_tree_search)
         save_playdata(steps)
 
 def replay(steps_list):
