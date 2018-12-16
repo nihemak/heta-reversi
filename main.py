@@ -127,6 +127,48 @@ def is_end_game(game, player):
     board, _, _ = player
     return is_end_board(board) or (is_pass_last_put(game) and not is_putable(player))
 
+class DualNet(chainer.Chain):
+    def __init__(self):
+        super(DualNet, self).__init__()
+        with self.init_scope():
+            self.conv0 = L.Convolution2D(4,  48, 3, pad=1)
+            self.conv1 = L.Convolution2D(48, 48, 3, pad=1)
+            self.conv2 = L.Convolution2D(48, 48, 3, pad=1)
+            self.conv3 = L.Convolution2D(48, 48, 3, pad=1)
+            self.conv4 = L.Convolution2D(48, 48, 3, pad=1)
+
+            self.bn0 = L.BatchNormalization(48)
+            self.bn1 = L.BatchNormalization(48)
+            self.bn2 = L.BatchNormalization(48)
+            self.bn3 = L.BatchNormalization(48)
+            self.bn4 = L.BatchNormalization(48)
+
+            self.conv_p1 = L.Convolution2D(48, 2, 1)
+            self.bn_p1   = L.BatchNormalization(2)
+            self.fc_p2   = L.Linear(8 * 8 * 2, 8 * 8)
+
+            self.conv_v1 = L.Convolution2D(48, 1, 1)
+            self.bn_v1   = L.BatchNormalization(1)
+            self.fc_v2   = L.Linear(8 * 8, 48)
+            self.fc_v3   = L.Linear(48, 1)
+
+    def __call__(self, x):
+        # tiny ResNet
+        h0 = F.relu(self.bn0(self.conv0(x)))
+        h1 = F.relu(self.bn1(self.conv1(h0)))
+        h2 = F.relu(self.bn2(self.conv2(h1)) + h0)
+        h3 = F.relu(self.bn3(self.conv3(h2)))
+        h4 = F.relu(self.bn4(self.conv4(h3)) + h2)
+
+        h_p1 = F.relu(self.bn_p1(self.conv_p1(h4)))
+        policy = self.fc_p2(h_p1)
+
+        h_v1  = F.relu(self.bn_v1(self.conv_v1(h4)))
+        h_v2  = F.relu(self.fc_v2(h_v1))
+        value = F.tanh(self.fc_v3(h_v2))
+
+        return policy, value
+
 class ChoiceReplaySteps:
     def __init__(self, steps):
         self._i = 0
@@ -239,32 +281,32 @@ class ChoiceMonteCarloTreeSearch:
         choice = nodes[index]['position_num']
         return choice
 
-class SampleChain(chainer.Chain):
-    def __init__(self, class_labels=10):
-        super(SampleChain, self).__init__()
-        with self.init_scope():
-            self.conv1_1 = L.Convolution2D(None, 16, ksize=5, pad=2, nobias=True)
-            self.conv1_2 = L.Convolution2D(None, 16, ksize=5, pad=2, nobias=True)
-            self.conv2_1 = L.Convolution2D(None, 32, ksize=3, pad=1, nobias=True)
-            self.conv2_2 = L.Convolution2D(None, 32, ksize=3, pad=1, nobias=True)
-            self.fc1 = L.Linear(None, 512, nobias=True)
-            self.fc2 = L.Linear(None, class_labels, nobias=True)
+class ChoiceSupervisedLearningPolicyNetwork:
+    def __init__(self, model):
+        self.model = model
 
-    def __call__(self, x):
-        conv1_1 = self.conv1_1(x)
-        conv1_1 = F.relu(conv1_1)
-        conv1_2 = self.conv1_2(conv1_1)
-        conv1_2 = F.relu(conv1_2)
-        pool1 = F.max_pooling_2d(conv1_2, ksize=2, stride=2)
-        conv2_1 = self.conv2_1(pool1)
-        conv2_1 = F.relu(conv2_1)
-        conv2_2 = self.conv2_2(conv2_1)
-        conv2_2 = F.relu(conv2_2)
-        pool2 = F.max_pooling_2d(conv2_2, ksize=2, stride=2)
-        fc1 = self.fc1(pool2)
-        fc1 = F.relu(fc1)
-        fc2 = self.fc2(fc1)
-        return fc2
+    def _create_x(self, player):
+        board, is_black, putable_position_nums = player
+
+        mine    = np.array([1 if (is_black and v == 1) or (not is_black and v == -1) else 0 for v in board], dtype=np.float32)
+        yours   = np.array([1 if (is_black and v == -1) or (not is_black and v == 1) else 0 for v in board], dtype=np.float32)
+        blank   = np.array([1 if v == 0 else 0 for v in board], dtype=np.float32)
+        putable = np.array([1 if i in putable_position_nums else 0 for i in range(64)], dtype=np.float32)
+
+        # 64 + 64 + 64 + 64
+        x = np.concatenate((mine, yours, blank, putable)).reshape((1, 4, 8, 8))
+        return x
+
+    def __call__(self, player):
+        _, _, putable_position_nums = player
+
+        policy, _ = self.model(self._create_x(player))
+
+        putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
+        indexs = np.where(putable_position_probabilities == putable_position_probabilities.max())[0]
+        index = np.random.choice(indexs)
+        choice = putable_position_nums[index]
+        return choice
 
 def choice_human(player):
     _, _, putable_position_nums = player
@@ -318,7 +360,7 @@ def save_playdata(steps):
 
 def play():
     while True:
-        steps = game(choice_human, ChoiceMonteCarloTreeSearch())
+        steps = game(choice_human, ChoiceSupervisedLearningPolicyNetwork(DualNet()))
         save_playdata(steps)
 
 def replay(steps_list):
