@@ -1,5 +1,3 @@
-FROM python:3.5.1
-
-RUN pip install numpy
+FROM chainer/chainer:v5.1.0-python3
 
 WORKDIR /src
