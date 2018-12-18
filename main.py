@@ -312,6 +312,17 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
     def __init__(self, model):
         self.model = model
 
+    def _get_node(self, player, position_num):
+        return {
+            'player': player,
+            'position_num': position_num,
+            'try_num': 0,
+            'win_num': 0,
+            'probability': 0.0,
+            'value': None,
+            'child_nodes': None
+        }
+
     def __call__(self, player, try_num = 1500):
         _, _, putable_position_nums = player
         return np.random.choice(putable_position_nums)
