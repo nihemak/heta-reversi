@@ -297,10 +297,14 @@ class ChoiceSupervisedLearningPolicyNetwork:
         x = np.concatenate((mine, yours, blank, putable)).reshape((1, 4, 8, 8))
         return x
 
+    def get_policy_and_value(self, player):
+        policy, value = self.model(self._create_x(player))
+        return policy, value
+
     def __call__(self, player):
         _, _, putable_position_nums = player
 
-        policy, _ = self.model(self._create_x(player))
+        policy, _ = self.get_policy_and_value(player)
 
         putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
         indexs = np.where(putable_position_probabilities == putable_position_probabilities.max())[0]
@@ -311,20 +315,38 @@ class ChoiceSupervisedLearningPolicyNetwork:
 class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
     def __init__(self, model):
         self.model = model
+        self.sl = ChoiceSupervisedLearningPolicyNetwork(self.model)
 
-    def _get_node(self, player, position_num):
+    def _get_node(self, player, position_num, probability):
         return {
             'player': player,
             'position_num': position_num,
             'try_num': 0,
             'win_num': 0,
-            'probability': 0.0,
+            'probability': probability,
             'value': None,
             'child_nodes': None
         }
 
+    def _get_initial_nodes(self, player):
+        board, is_black, putable_position_nums = player
+
+        policy, value = self.sl.get_policy_and_value(player)
+
+        putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
+        putable_position_probabilities /= putable_position_probabilities.sum()
+
+        v = value[0][0].data
+
+        nodes = [self._get_node(get_player(put(player, position_num), not is_black), position_num, putable_position_probabilities[i]) for i, position_num in enumerate(putable_position_nums)]
+        if len(putable_position_nums) == 0:
+            nodes = [self._get_node(get_player(board, not is_black), None, None)]
+
+        return v, nodes
+
     def __call__(self, player, try_num = 1500):
         _, _, putable_position_nums = player
+        _value, _nodes = self._get_initial_nodes(player)
         return np.random.choice(putable_position_nums)
 
 def choice_human(player):
