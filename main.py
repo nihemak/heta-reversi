@@ -297,15 +297,103 @@ class ChoiceSupervisedLearningPolicyNetwork:
         x = np.concatenate((mine, yours, blank, putable)).reshape((1, 4, 8, 8))
         return x
 
+    def get_policy_and_value(self, player):
+        policy, value = self.model(self._create_x(player))
+        return policy, value
+
     def __call__(self, player):
         _, _, putable_position_nums = player
 
-        policy, _ = self.model(self._create_x(player))
+        policy, _ = self.get_policy_and_value(player)
 
         putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
         indexs = np.where(putable_position_probabilities == putable_position_probabilities.max())[0]
         index = np.random.choice(indexs)
         choice = putable_position_nums[index]
+        return choice
+
+class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
+    def __init__(self, model):
+        self.model = model
+        self.sl = ChoiceSupervisedLearningPolicyNetwork(self.model)
+
+    def _get_node(self, player, position_num, probability):
+        return {
+            'player': player,
+            'position_num': position_num,
+            'try_num': 0,
+            'win_num': 0,
+            'probability': probability,
+            'value': None,
+            'child_nodes': None
+        }
+
+    def _get_initial_nodes(self, player):
+        board, is_black, putable_position_nums = player
+
+        policy, value = self.sl.get_policy_and_value(player)
+
+        putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
+        putable_position_probabilities /= putable_position_probabilities.sum()
+
+        v = value[0][0].data
+
+        nodes = [self._get_node(get_player(put(player, position_num), not is_black), position_num, putable_position_probabilities[i]) for i, position_num in enumerate(putable_position_nums)]
+        if len(putable_position_nums) == 0:
+            nodes = [self._get_node(get_player(board, not is_black), None, 1.0)]
+
+        return v, nodes
+
+    def _get_score(self, node, total_num):
+        return (node['win_num'] / (1 + node['try_num'])) + node['probability'] * (math.sqrt(total_num) / (1 + node['try_num']))
+
+    def _selection_node_index(self, nodes):
+        total_num = functools.reduce(lambda total_num, node: total_num + node['try_num'], nodes, 0)
+        scores = np.array([self._get_score(node, total_num) for node in nodes])
+        indexs = np.where(scores == scores.max())[0]
+        index = np.random.choice(indexs)
+        return index
+
+    def _selection_expansion(self, nodes):
+        game = []
+        node, path = None, []
+        target_nodes = nodes
+        while True:
+            index = self._selection_node_index(target_nodes)
+            path.append(index)
+            node = target_nodes[index]
+            if node['child_nodes'] is None:
+                # expansion
+                value, child_nodes = self._get_initial_nodes(node['player'])
+                node['value'] = value
+                if not is_end_game(game, node['player']):
+                    node['child_nodes'] = child_nodes
+                break
+            target_nodes = node['child_nodes']
+            game.append((node['player'], node['position_num']))
+        return nodes, node, path
+
+    def _backup(self, nodes, path, value):
+        target_nodes = nodes
+        for index in path:
+            target_nodes[index]['try_num'] += 1
+            target_nodes[index]['win_num'] += value
+            target_nodes = target_nodes[index]['child_nodes']
+        return nodes
+
+    def _choice_node_index(self, nodes):
+        try_nums = np.array([node['try_num'] for node in nodes])
+        indexs = np.where(try_nums == try_nums.max())[0]
+        index = np.random.choice(indexs)
+        return index
+
+    def __call__(self, player, try_num = 1500):
+        _, nodes = self._get_initial_nodes(player)
+        for _ in range(try_num):
+            nodes, node, path = self._selection_expansion(nodes)
+            nodes = self._backup(nodes, path, node['value'])
+        index = self._choice_node_index(nodes)
+        choice = nodes[index]['position_num']
         return choice
 
 def choice_human(player):
@@ -360,7 +448,7 @@ def save_playdata(steps):
 
 def play():
     while True:
-        steps = game(choice_human, ChoiceSupervisedLearningPolicyNetwork(DualNet()))
+        steps = game(choice_human, ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(DualNet()))
         save_playdata(steps)
 
 def replay(steps_list):
