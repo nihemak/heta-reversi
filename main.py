@@ -340,14 +340,61 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
 
         nodes = [self._get_node(get_player(put(player, position_num), not is_black), position_num, putable_position_probabilities[i]) for i, position_num in enumerate(putable_position_nums)]
         if len(putable_position_nums) == 0:
-            nodes = [self._get_node(get_player(board, not is_black), None, None)]
+            nodes = [self._get_node(get_player(board, not is_black), None, 1.0)]
 
         return v, nodes
 
+    def _get_score(self, node, total_num):
+        return (node['win_num'] / (1 + node['try_num'])) + node['probability'] * (math.sqrt(total_num) / (1 + node['try_num']))
+
+    def _selection_node_index(self, nodes):
+        total_num = functools.reduce(lambda total_num, node: total_num + node['try_num'], nodes, 0)
+        scores = np.array([self._get_score(node, total_num) for node in nodes])
+        indexs = np.where(scores == scores.max())[0]
+        index = np.random.choice(indexs)
+        return index
+
+    def _selection_expansion(self, nodes):
+        game = []
+        node, path = None, []
+        target_nodes = nodes
+        while True:
+            index = self._selection_node_index(target_nodes)
+            path.append(index)
+            node = target_nodes[index]
+            if node['child_nodes'] is None:
+                # expansion
+                value, child_nodes = self._get_initial_nodes(node['player'])
+                node['value'] = value
+                if not is_end_game(game, node['player']):
+                    node['child_nodes'] = child_nodes
+                break
+            target_nodes = node['child_nodes']
+            game.append((node['player'], node['position_num']))
+        return nodes, node, path
+
+    def _backup(self, nodes, path, value):
+        target_nodes = nodes
+        for index in path:
+            target_nodes[index]['try_num'] += 1
+            target_nodes[index]['win_num'] += value
+            target_nodes = target_nodes[index]['child_nodes']
+        return nodes
+
+    def _choice_node_index(self, nodes):
+        try_nums = np.array([node['try_num'] for node in nodes])
+        indexs = np.where(try_nums == try_nums.max())[0]
+        index = np.random.choice(indexs)
+        return index
+
     def __call__(self, player, try_num = 1500):
-        _, _, putable_position_nums = player
-        _value, _nodes = self._get_initial_nodes(player)
-        return np.random.choice(putable_position_nums)
+        _, nodes = self._get_initial_nodes(player)
+        for _ in range(try_num):
+            nodes, node, path = self._selection_expansion(nodes)
+            nodes = self._backup(nodes, path, node['value'])
+        index = self._choice_node_index(nodes)
+        choice = nodes[index]['position_num']
+        return choice
 
 def choice_human(player):
     _, _, putable_position_nums = player
