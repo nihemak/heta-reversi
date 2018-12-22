@@ -402,7 +402,8 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
             nodes = self._backup(nodes, path, node['value'])
         index = self._choice_node_index(nodes)
         choice = nodes[index]['position_num']
-        choice_data = { 'position_num': choice }
+        candidates = [{ 'position_num': "{}".format(node['position_num']), 'try_num': "{}".format(node['try_num']) } for node in nodes]
+        choice_data = { 'position_num': choice, 'candidates': candidates }
         return choice_data
 
 def choice_human(player):
@@ -457,10 +458,32 @@ def save_playdata(steps):
     with open(filename, 'a') as f:
         f.write("{}\n".format(json.dumps(playdata)))
 
+def save_self_playdata(steps):
+    self_playdata = []
+    for step in steps:
+        _, choice_data = step
+        position_num = choice_data['position_num']
+        self_playdata.append({
+            "position_num": "{}".format(position_num if position_num is not None else -1),
+            'candidates': choice_data['candidates']
+        })
+    filename = 'data/self_playdata_{}.dat'.format(datetime.date.today().strftime("%Y%m%d"))
+    with open(filename, 'a') as f:
+        f.write("{}\n".format(json.dumps(self_playdata)))
+
 def play():
     while True:
         steps = game(choice_human, ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(DualNet()))
         save_playdata(steps)
+
+def self_play():
+    model1 = DualNet()
+    model2 = DualNet()
+    steps = game(
+        ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1),
+        ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model2)
+    )
+    save_self_playdata(steps)
 
 def replay(steps_list):
     for steps in steps_list:
@@ -477,7 +500,10 @@ if __name__ == "__main__":
         with open(args[2], 'r') as f:
             steps_list = f.readlines()
             replay(steps_list)
+    elif len(args) > 1 and args[1] == 'selfplay':
+        self_play()
     else:
         print('Usage error:', file=sys.stderr)
         print(' - python main.py play', file=sys.stderr)
         print(' - python main.py replay filepath-playdata', file=sys.stderr)
+        print(' - python main.py selfplay', file=sys.stderr)
