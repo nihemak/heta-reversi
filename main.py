@@ -120,7 +120,8 @@ def render_board(player):
 def is_pass_last_put(game):
     if len(game) == 0:
         return False
-    _, position_num = game[-1]
+    _, choice_data = game[-1]
+    position_num = choice_data['position_num']
     return position_num == None
 
 def is_end_game(game, player):
@@ -185,11 +186,13 @@ class ChoiceReplaySteps:
         if step not in putable_position_nums:
             step = np.random.choice(putable_position_nums)
         self._i += 1
-        return step
+        choice_data = { 'position_num': step }
+        return choice_data
 
 def choice_random(player):
     _, _, putable_position_nums = player
-    return np.random.choice(putable_position_nums)
+    choice_data = { 'position_num': np.random.choice(putable_position_nums) }
+    return choice_data
 
 def choice_primitive_monte_carlo(player, try_num = 150):
     _, _, putable_position_nums = player
@@ -198,7 +201,8 @@ def choice_primitive_monte_carlo(player, try_num = 150):
         playouts = [playout(player, position_num) for position_num in putable_position_nums]
         position_scores += np.array([1 if is_win else 0 for is_win in playouts])
     index = np.random.choice(np.where(position_scores == position_scores.max())[0])
-    return putable_position_nums[index]
+    choice_data = { 'position_num': putable_position_nums[index] }
+    return choice_data
 
 class ChoiceMonteCarloTreeSearch:
     def _get_node(self, player, position_num):
@@ -246,7 +250,8 @@ class ChoiceMonteCarloTreeSearch:
                 else:
                     break
             target_nodes = node['child_nodes']
-            game.append((node['player'], node['position_num']))
+            choice_data = { 'position_num': node['position_num'] }
+            game.append((node['player'], choice_data))
         return nodes, node, path
 
     def _evaluation(self, node, is_black):
@@ -279,7 +284,8 @@ class ChoiceMonteCarloTreeSearch:
             nodes = self._backup(nodes, path, is_win)
         index = self._choice_node_index(nodes)
         choice = nodes[index]['position_num']
-        return choice
+        choice_data = { 'position_num': choice }
+        return choice_data
 
 class ChoiceSupervisedLearningPolicyNetwork:
     def __init__(self, model):
@@ -310,7 +316,8 @@ class ChoiceSupervisedLearningPolicyNetwork:
         indexs = np.where(putable_position_probabilities == putable_position_probabilities.max())[0]
         index = np.random.choice(indexs)
         choice = putable_position_nums[index]
-        return choice
+        choice_data = { 'position_num': choice }
+        return choice_data
 
 class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
     def __init__(self, model):
@@ -370,7 +377,8 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
                     node['child_nodes'] = child_nodes
                 break
             target_nodes = node['child_nodes']
-            game.append((node['player'], node['position_num']))
+            choice_data = { 'position_num': node['position_num'] }
+            game.append((node['player'], choice_data))
         return nodes, node, path
 
     def _backup(self, nodes, path, value):
@@ -394,7 +402,8 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
             nodes = self._backup(nodes, path, node['value'])
         index = self._choice_node_index(nodes)
         choice = nodes[index]['position_num']
-        return choice
+        choice_data = { 'position_num': choice }
+        return choice_data
 
 def choice_human(player):
     _, _, putable_position_nums = player
@@ -409,7 +418,8 @@ def choice_human(player):
                 print("{} is invalid".format(choice))
         except Exception:
             print("{} is invalid".format(choice))
-    return choice
+    choice_data = { 'position_num': choice }
+    return choice_data
 
 def game(choice_black, choice_white, board = None, is_render = True):
     game = []
@@ -425,21 +435,23 @@ def game(choice_black, choice_white, board = None, is_render = True):
         position_num = None
         if is_putable(player):
             choice = choice_black if is_black else choice_white
-            position_num = choice(player)
+            choice_data = choice(player)
+            position_num = choice_data["position_num"]
             if is_render:
                 print(position_num)
             board = put(player, position_num)
         else:
             if is_render:
                 print("pass")
-        game.append((player, position_num))
+        game.append((player, choice_data))
         player = get_player(board, not is_black)
     return game
 
 def save_playdata(steps):
     playdata = []
     for step in steps:
-        _, position_num = step
+        _, choice_data = step
+        position_num = choice_data['position_num']
         playdata.append({"position_num": "{}".format(position_num if position_num is not None else -1)})
     filename = 'data/playdata_{}.dat'.format(datetime.date.today().strftime("%Y%m%d"))
     with open(filename, 'a') as f:
