@@ -89,16 +89,10 @@ def put(player, position_num):
     return board
 
 def playout(player, position_num):
-    is_win = False
     _, is_black, _ = player
     board = put(player, position_num)
     puts = game(choice_random, choice_random, board, False)
-    if len(puts) > 0:
-        player_last, _ = puts[-1]
-        board_last, _, _ = player_last
-        black_num, white_num = get_stone_num(board_last)
-        if (is_black and black_num > white_num) or (not is_black and black_num < white_num):
-            is_win = True
+    is_win = is_win_game(puts, is_black)
     return is_win
 
 def is_putable(player):
@@ -123,6 +117,16 @@ def is_pass_last_put(game):
     _, choice_data = game[-1]
     position_num = choice_data['position_num']
     return position_num == None
+
+def is_win_game(game, is_black):
+    is_win = False
+    if len(game) > 0:
+        player_last, _ = game[-1]
+        board_last, _, _ = player_last
+        black_num, white_num = get_stone_num(board_last)
+        if (is_black and black_num > white_num) or (not is_black and black_num < white_num):
+            is_win = True
+    return is_win
 
 def is_end_game(game, player):
     board, _, _ = player
@@ -476,14 +480,35 @@ def play():
         steps = game(choice_human, ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(DualNet()))
         save_playdata(steps)
 
-def self_play():
-    model1 = DualNet()
-    model2 = DualNet()
-    steps = game(
-        ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1),
-        ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model2)
-    )
-    save_self_playdata(steps)
+def self_play(model1, model2, try_num = 2500):
+    player1 = {
+        'is_model1': True,
+        'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1),
+        'win_num': 0
+    }
+    player2 = {
+        'is_model1': False,
+        'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model2),
+        'win_num': 0
+    }
+
+    for _ in range(try_num):
+        steps = game(player1['choice'], player2['choice'])
+        if is_win_game(steps, True):
+            player1['win_num'] += 1
+        if is_win_game(steps, False):
+            player2['win_num'] += 1
+        save_self_playdata(steps)
+        player1, player2 = player2, player1
+
+    model1_win_num = model2_win_num = 0
+    if player1['is_model1']:
+        model1_win_num = player1['win_num']
+        model2_win_num = player2['win_num']
+    else:
+        model2_win_num = player1['win_num']
+        model1_win_num = player2['win_num']
+    return model1_win_num, model2_win_num
 
 def replay(steps_list):
     for steps in steps_list:
@@ -501,7 +526,8 @@ if __name__ == "__main__":
             steps_list = f.readlines()
             replay(steps_list)
     elif len(args) > 1 and args[1] == 'selfplay':
-        self_play()
+        model1_win_num, model2_win_num = self_play(DualNet(), DualNet())
+        print("model1_win_num: {} model2_win_num: {}".format(model1_win_num, model2_win_num))
     else:
         print('Usage error:', file=sys.stderr)
         print(' - python main.py play', file=sys.stderr)
