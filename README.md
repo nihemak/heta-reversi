@@ -12,7 +12,7 @@ $ export PYTHONIOENCODING=utf-8; python3 main.py play
 * replay play data
 
 ```bash
-$ export PYTHONIOENCODING=utf-8; python3 main.py replay data/playdata_xxxxxxxx.csv
+$ export PYTHONIOENCODING=utf-8; python3 main.py replay data/playdata_xxxxxxxx.dat
 ```
 
 ```bash
