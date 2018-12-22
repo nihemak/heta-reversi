@@ -464,13 +464,24 @@ def save_playdata(steps):
 
 def save_self_playdata(steps):
     self_playdata = []
+    is_black_win = is_win_game(steps, True)
+    is_white_win = is_win_game(steps, False)
+
+    is_black = True
     for step in steps:
         _, choice_data = step
         position_num = choice_data['position_num']
+        win_score = -1
+        if is_black_win and is_white_win:
+            win_score = 0
+        elif (is_black and is_black_win) or (not is_black and is_white_win):
+            win_score = 1
         self_playdata.append({
             "position_num": "{}".format(position_num if position_num is not None else -1),
+            "win_score": "{}".format(win_score),
             'candidates': choice_data['candidates']
         })
+        is_black = not is_black
     filename = 'data/self_playdata_{}.dat'.format(datetime.date.today().strftime("%Y%m%d"))
     with open(filename, 'a') as f:
         f.write("{}\n".format(json.dumps(self_playdata)))
