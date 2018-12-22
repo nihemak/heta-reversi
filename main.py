@@ -3,7 +3,7 @@
 import numpy as np
 import math
 import functools
-import csv
+import json
 import datetime
 import sys
 import chainer
@@ -437,14 +437,13 @@ def game(choice_black, choice_white, board = None, is_render = True):
     return game
 
 def save_playdata(steps):
-    position_nums = []
+    playdata = []
     for step in steps:
         _, position_num = step
-        position_nums.append(position_num if position_num is not None else -1)
-    filename = 'data/playdata_{}.csv'.format(datetime.date.today().strftime("%Y%m%d"))
+        playdata.append({"position_num": "{}".format(position_num if position_num is not None else -1)})
+    filename = 'data/playdata_{}.dat'.format(datetime.date.today().strftime("%Y%m%d"))
     with open(filename, 'a') as f:
-        writer = csv.writer(f, lineterminator='\n')
-        writer.writerow(position_nums)
+        f.write("{}\n".format(json.dumps(playdata)))
 
 def play():
     while True:
@@ -453,8 +452,9 @@ def play():
 
 def replay(steps_list):
     for steps in steps_list:
-        choice1 = ChoiceReplaySteps(np.array(steps, dtype=np.int32)[::2])
-        choice2 = ChoiceReplaySteps(np.array(steps, dtype=np.int32)[1::2])
+        position_nums = [int(step['position_num']) for step in json.loads(steps)]
+        choice1 = ChoiceReplaySteps(np.array(position_nums, dtype=np.int32)[::2])
+        choice2 = ChoiceReplaySteps(np.array(position_nums, dtype=np.int32)[1::2])
         game(choice1, choice2)
 
 if __name__ == "__main__":
@@ -463,7 +463,7 @@ if __name__ == "__main__":
         play()
     elif len(args) > 2 and args[1] == 'replay':
         with open(args[2], 'r') as f:
-            steps_list = csv.reader(f)
+            steps_list = f.readlines()
             replay(steps_list)
     else:
         print('Usage error:', file=sys.stderr)
