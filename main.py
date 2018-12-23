@@ -10,6 +10,7 @@ import uuid
 import chainer
 import chainer.functions as F
 import chainer.links as L
+from chainer import Variable, serializers
 
 def get_init_board():
     board = np.array([0] * 64, dtype=np.float32)
@@ -133,6 +134,18 @@ def is_end_game(game, player):
     board, _, _ = player
     return is_end_board(board) or (is_pass_last_put(game) and not is_putable(player))
 
+def get_dualnet_input_data(player):
+    board, is_black, putable_position_nums = player
+
+    mine    = np.array([1 if (is_black and v == 1) or (not is_black and v == -1) else 0 for v in board], dtype=np.float32)
+    yours   = np.array([1 if (is_black and v == -1) or (not is_black and v == 1) else 0 for v in board], dtype=np.float32)
+    blank   = np.array([1 if v == 0 else 0 for v in board], dtype=np.float32)
+    putable = np.array([1 if i in putable_position_nums else 0 for i in range(64)], dtype=np.float32)
+
+    # 64 + 64 + 64 + 64
+    x = np.concatenate((mine, yours, blank, putable)).reshape((1, 4, 8, 8))
+    return x
+
 class DualNet(chainer.Chain):
     def __init__(self):
         super(DualNet, self).__init__()
@@ -174,6 +187,12 @@ class DualNet(chainer.Chain):
         value = F.tanh(self.fc_v3(h_v2))
 
         return policy, value
+
+    def load(self, filename):
+        serializers.load_npz(filename, self)
+
+    def save(self, filename):
+        serializers.save_npz(filename, self)
 
 class ChoiceReplaySteps:
     def __init__(self, steps):
@@ -296,20 +315,8 @@ class ChoiceSupervisedLearningPolicyNetwork:
     def __init__(self, model):
         self.model = model
 
-    def _create_x(self, player):
-        board, is_black, putable_position_nums = player
-
-        mine    = np.array([1 if (is_black and v == 1) or (not is_black and v == -1) else 0 for v in board], dtype=np.float32)
-        yours   = np.array([1 if (is_black and v == -1) or (not is_black and v == 1) else 0 for v in board], dtype=np.float32)
-        blank   = np.array([1 if v == 0 else 0 for v in board], dtype=np.float32)
-        putable = np.array([1 if i in putable_position_nums else 0 for i in range(64)], dtype=np.float32)
-
-        # 64 + 64 + 64 + 64
-        x = np.concatenate((mine, yours, blank, putable)).reshape((1, 4, 8, 8))
-        return x
-
     def get_policy_and_value(self, player):
-        policy, value = self.model(self._create_x(player))
+        policy, value = self.model(get_dualnet_input_data(player))
         return policy, value
 
     def __call__(self, player):
@@ -411,6 +418,140 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
         choice_data = { 'position_num': choice, 'candidates': candidates }
         return choice_data
 
+class DualNetTrainer:
+    def __init__(self, model = None):
+        if model is None:
+            model = DualNet()
+        self._set_model(model)
+
+    def _set_model(self, model):
+        self.model = model
+        date_str   = datetime.date.today().strftime("%Y%m%d")
+        unique_str = str(uuid.uuid4())
+        self.model_filename = 'data/model_{}_{}.dat'.format(date_str, unique_str)
+        self.model.save(self.model_filename)
+        print("[set model] model_filename: {}".format(self.model_filename))
+
+    def _save_self_playdata(self, steps, filename):
+        self_playdata = []
+        is_black_win = is_win_game(steps, is_black = True)
+        is_white_win = is_win_game(steps, is_black = False)
+
+        is_black = True
+        for step in steps:
+            _, choice_data = step
+            position_num = choice_data['position_num']
+            win_score = -1
+            if is_black_win and is_white_win:
+                win_score = 0
+            elif (is_black and is_black_win) or (not is_black and is_white_win):
+                win_score = 1
+            self_playdata.append({
+                "position_num": "{}".format(position_num if position_num is not None else -1),
+                "win_score": "{}".format(win_score),
+                'candidates': choice_data['candidates']
+            })
+            is_black = not is_black
+        with open(filename, 'a') as f:
+            f.write("{}\n".format(json.dumps(self_playdata)))
+
+    def _self_play(self, model1, model2, try_num = 2500, is_save_data = True):
+        player1 = {
+            'is_model1': True,
+            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1),
+            'win_num': 0
+        }
+        player2 = {
+            'is_model1': False,
+            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model2),
+            'win_num': 0
+        }
+        date_str   = datetime.date.today().strftime("%Y%m%d")
+        unique_str = str(uuid.uuid4())
+        data_filename = 'data/self_playdata_{}_{}.dat'.format(date_str, unique_str)
+        print("[self play] data_filename: {}".format(data_filename))
+        for i in range(try_num):
+            steps = game(player1['choice'], player2['choice'], is_render = False)
+            if is_win_game(steps, is_black = True):
+                player1['win_num'] += 1
+            if is_win_game(steps, is_black = False):
+                player2['win_num'] += 1
+            if is_save_data:
+                self._save_self_playdata(steps, data_filename)
+            player1, player2 = player2, player1
+            (model1_player, model2_player) = (player1, player2) if player1['is_model1'] else (player2, player1)
+            print("[self play] epoch: {} / {}, model1_win_num: {}, model2_win_num: {}".format(i + 1, try_num, model1_player['win_num'], model2_player['win_num']))
+        (model1_win_num, model2_win_num) = (player1['win_num'], player2['win_num']) if player1['is_model1'] else (player2['win_num'], player1['win_num'])
+        return model1_win_num, model2_win_num, data_filename
+
+    def _get_train_y_policy(self, candidates, temperature = 0.5):
+        y_policy = np.array([0] * 64, dtype=np.float32)
+        sum_try_num = np.array([int(candidate['try_num']) ** (1 / temperature) for candidate in candidates]).sum()
+        for candidate in candidates:
+            y_policy[int(candidate['position_num'])] = (int(candidate['try_num']) ** (1 / temperature)) / sum_try_num
+        return y_policy
+
+    def _get_train_x(self, steps, step_num):
+        position_nums = [int(step['position_num']) for step in steps]
+        choice1 = ChoiceReplaySteps(np.array(position_nums, dtype=np.int32)[::2])
+        choice2 = ChoiceReplaySteps(np.array(position_nums, dtype=np.int32)[1::2])
+        steps = game(choice1, choice2, is_render = False, limit_step_num = step_num)
+        player, _ = steps[-1]
+        x = get_dualnet_input_data(player)
+        return x
+
+    def _get_train_random(self, steps_list):
+        steps      = json.loads(np.random.choice(steps_list))
+        step_index = np.random.randint(0, len(steps) - 1)
+
+        y_policy = self._get_train_y_policy(steps[step_index]['candidates'])
+        y_value  = np.array([[int(steps[step_index]['win_score'])]], dtype=np.float32)
+        x        = self._get_train_x(steps, (step_index + 1))
+        return x, y_policy, y_value
+
+    def _get_train_batch(self, steps_list, batch_size):
+        batch_x, batch_y_policy, batch_y_value = [], [], []
+        for _ in range(batch_size):
+            x, y_policy, y_value = self._get_train_random(steps_list)
+            batch_x.append(x)
+            batch_y_policy.append(y_policy)
+            batch_y_value.append(y_value)
+        x_train        = Variable(np.array(batch_x)).reshape(-1, 4, 8, 8)
+        y_train_policy = Variable(np.array(batch_y_policy)).reshape(-1, 64)
+        y_train_value  = Variable(np.array(batch_y_value)).reshape(-1, 1)
+        return x_train, y_train_policy, y_train_value
+
+    def _create_new_model(self, steps_list, epoch_num = 100, batch_size = 2048):
+        model = DualNet()
+        model.load(self.model_filename)
+        optimizer = chainer.optimizers.Adam()
+        optimizer.setup(model)
+        for i in range(epoch_num):
+            x_train, y_train_policy, y_train_value = self._get_train_batch(steps_list, batch_size)
+            y_policy, y_value = model(x_train)
+            model.cleargrads()
+            loss = F.mean_squared_error(y_policy, y_train_policy) + F.mean_squared_error(y_value, y_train_value)
+            loss.backward()
+            optimizer.update()
+            print("[new nodel] epoch: {} / {}, loss: {}".format(i + 1, epoch_num, loss))
+        return model
+
+    def _evaluation(self, new_model):
+        _, new_model_win_num, _ = self._self_play(self.model, new_model, try_num = 400, is_save_data = False)
+        if new_model_win_num >= 220:
+            self._set_model(new_model)
+
+    def __call__(self, try_num = 100):
+        for i in range(try_num):
+            _, _, data_filename = self._self_play(self.model, self.model)
+            steps_list = []
+            with open(data_filename, 'r') as f:
+                steps_list = f.readlines()
+            new_model = self._create_new_model(steps_list)
+            self._evaluation(new_model)
+            print("[train] epoch: {} / {}".format(i + 1, try_num))
+        return self.model, self.model_filename
+
 def choice_human(player):
     _, _, putable_position_nums = player
     choice = None
@@ -427,16 +568,19 @@ def choice_human(player):
     choice_data = { 'position_num': choice }
     return choice_data
 
-def game(choice_black, choice_white, board = None, is_render = True):
-    game = []
+def game(choice_black, choice_white, board = None, is_render = True, limit_step_num = None):
+    steps = []
     if board is None:
         board = get_init_board()
     player = get_player(board)
+    step_num = 0
     while True:
+        if limit_step_num is not None and step_num >= limit_step_num:
+            break
         board, is_black, _ = player
         if is_render:
             render_board(player)
-        if is_end_game(game, player):
+        if is_end_game(steps, player):
             break
         position_num = None
         if is_putable(player):
@@ -449,9 +593,10 @@ def game(choice_black, choice_white, board = None, is_render = True):
         else:
             if is_render:
                 print("pass")
-        game.append((player, choice_data))
+        steps.append((player, choice_data))
         player = get_player(board, not is_black)
-    return game
+        step_num += 1
+    return steps
 
 def save_playdata(steps):
     playdata = []
@@ -463,68 +608,10 @@ def save_playdata(steps):
     with open(filename, 'a') as f:
         f.write("{}\n".format(json.dumps(playdata)))
 
-def save_self_playdata(steps, filename):
-    self_playdata = []
-    is_black_win = is_win_game(steps, True)
-    is_white_win = is_win_game(steps, False)
-
-    is_black = True
-    for step in steps:
-        _, choice_data = step
-        position_num = choice_data['position_num']
-        win_score = -1
-        if is_black_win and is_white_win:
-            win_score = 0
-        elif (is_black and is_black_win) or (not is_black and is_white_win):
-            win_score = 1
-        self_playdata.append({
-            "position_num": "{}".format(position_num if position_num is not None else -1),
-            "win_score": "{}".format(win_score),
-            'candidates': choice_data['candidates']
-        })
-        is_black = not is_black
-    with open(filename, 'a') as f:
-        f.write("{}\n".format(json.dumps(self_playdata)))
-
 def play():
     while True:
         steps = game(choice_human, ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(DualNet()))
         save_playdata(steps)
-
-def self_play(model1, model2, try_num = 2500):
-    player1 = {
-        'is_model1': True,
-        'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1),
-        'win_num': 0
-    }
-    player2 = {
-        'is_model1': False,
-        'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model2),
-        'win_num': 0
-    }
-
-    data_filename = 'data/self_playdata_{}_{}.dat'.format(datetime.date.today().strftime("%Y%m%d"), str(uuid.uuid4()))
-    for _ in range(try_num):
-        steps = game(player1['choice'], player2['choice'])
-        if is_win_game(steps, True):
-            player1['win_num'] += 1
-        if is_win_game(steps, False):
-            player2['win_num'] += 1
-        save_self_playdata(steps, data_filename)
-        player1, player2 = player2, player1
-
-    model1_win_num = model2_win_num = 0
-    if player1['is_model1']:
-        model1_win_num = player1['win_num']
-        model2_win_num = player2['win_num']
-    else:
-        model2_win_num = player1['win_num']
-        model1_win_num = player2['win_num']
-    return model1_win_num, model2_win_num, data_filename
-
-def create_learn_data(model):
-    _, _, data_filename = self_play(model, model)
-    return data_filename
 
 def replay(steps_list):
     for steps in steps_list:
@@ -541,11 +628,12 @@ if __name__ == "__main__":
         with open(args[2], 'r') as f:
             steps_list = f.readlines()
             replay(steps_list)
-    elif len(args) > 1 and args[1] == 'selfplay':
-        model1_win_num, model2_win_num, _ = self_play(DualNet(), DualNet())
-        print("model1_win_num: {} model2_win_num: {}".format(model1_win_num, model2_win_num))
+    elif len(args) > 1 and args[1] == 'train':
+        trainer = DualNetTrainer()
+        _, model_filename = trainer()
+        print(model_filename)
     else:
         print('Usage error:', file=sys.stderr)
         print(' - python main.py play', file=sys.stderr)
         print(' - python main.py replay filepath-playdata', file=sys.stderr)
-        print(' - python main.py selfplay', file=sys.stderr)
+        print(' - python main.py train', file=sys.stderr)
