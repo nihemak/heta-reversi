@@ -608,10 +608,48 @@ def save_playdata(steps):
     with open(filename, 'a') as f:
         f.write("{}\n".format(json.dumps(playdata)))
 
-def play(choice):
+def yes_no_input(message):
+    yes = False
     while True:
-        steps = game(choice_human, choice)
+        try:
+            choice = input(message).lower()
+            if choice in ['y', 'ye', 'yes']:
+                yes = True
+                break
+            elif choice in ['n', 'no']:
+                break
+            else:
+                print("{} is invalid".format(choice))
+        except Exception:
+            print("{} is invalid".format(choice))
+    return yes
+
+def play(choice_computer):
+    choice1 = {
+        'name': "You",
+        'choice': choice_human
+    }
+    choice2 = {
+        'name': "Computer",
+        'choice': choice_computer
+    }
+    while True:
+        print("start: {} vs {}".format(choice1['name'], choice2['name']))
+
+        steps = game(choice1['choice'], choice2['choice'])
+
+        is_black_win = is_win_game(steps, is_black = True)
+        is_white_win = is_win_game(steps, is_black = False)
+        if is_black_win:
+            print("{} is win".format(choice1['name']))
+        elif is_white_win:
+            print("{} is win".format(choice2['name']))
+        else:
+            print("draw")
         save_playdata(steps)
+        if not yes_no_input("Do you want to continue? [y/N]: "):
+            break
+        choice1, choice2 = choice2, choice1
 
 def replay(steps_list):
     for steps in steps_list:
