@@ -644,8 +644,14 @@ if __name__ == "__main__":
         with open(args[2], 'r') as f:
             steps_list = f.readlines()
             replay(steps_list)
-    elif len(args) > 1 and args[1] == 'train':
+    elif len(args) > 1 and args[1] == 'create-model':
         trainer = DualNetTrainer()
+        _, model_filename = trainer()
+        print(model_filename)
+    elif len(args) > 2 and args[1] == 'train-model':
+        model = DualNet()
+        model.load(args[2])
+        trainer = DualNetTrainer(model)
         _, model_filename = trainer()
         print(model_filename)
     else:
@@ -658,4 +664,5 @@ if __name__ == "__main__":
         print(' - python main.py play-apv-mcts-random', file=sys.stderr)
         print(' - python main.py play-apv-mcts filepath-modeldata', file=sys.stderr)
         print(' - python main.py replay filepath-playdata', file=sys.stderr)
-        print(' - python main.py train', file=sys.stderr)
+        print(' - python main.py create-model', file=sys.stderr)
+        print(' - python main.py train-model filepath-modeldata', file=sys.stderr)
