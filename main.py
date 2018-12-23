@@ -6,6 +6,7 @@ import functools
 import json
 import datetime
 import sys
+import uuid
 import chainer
 import chainer.functions as F
 import chainer.links as L
@@ -462,7 +463,7 @@ def save_playdata(steps):
     with open(filename, 'a') as f:
         f.write("{}\n".format(json.dumps(playdata)))
 
-def save_self_playdata(steps):
+def save_self_playdata(steps, filename):
     self_playdata = []
     is_black_win = is_win_game(steps, True)
     is_white_win = is_win_game(steps, False)
@@ -482,7 +483,6 @@ def save_self_playdata(steps):
             'candidates': choice_data['candidates']
         })
         is_black = not is_black
-    filename = 'data/self_playdata_{}.dat'.format(datetime.date.today().strftime("%Y%m%d"))
     with open(filename, 'a') as f:
         f.write("{}\n".format(json.dumps(self_playdata)))
 
@@ -503,13 +503,14 @@ def self_play(model1, model2, try_num = 2500):
         'win_num': 0
     }
 
+    data_filename = 'data/self_playdata_{}_{}.dat'.format(datetime.date.today().strftime("%Y%m%d"), str(uuid.uuid4()))
     for _ in range(try_num):
         steps = game(player1['choice'], player2['choice'])
         if is_win_game(steps, True):
             player1['win_num'] += 1
         if is_win_game(steps, False):
             player2['win_num'] += 1
-        save_self_playdata(steps)
+        save_self_playdata(steps, data_filename)
         player1, player2 = player2, player1
 
     model1_win_num = model2_win_num = 0
@@ -519,7 +520,11 @@ def self_play(model1, model2, try_num = 2500):
     else:
         model2_win_num = player1['win_num']
         model1_win_num = player2['win_num']
-    return model1_win_num, model2_win_num
+    return model1_win_num, model2_win_num, data_filename
+
+def create_learn_data(model):
+    _, _, data_filename = self_play(model, model)
+    return data_filename
 
 def replay(steps_list):
     for steps in steps_list:
@@ -537,7 +542,7 @@ if __name__ == "__main__":
             steps_list = f.readlines()
             replay(steps_list)
     elif len(args) > 1 and args[1] == 'selfplay':
-        model1_win_num, model2_win_num = self_play(DualNet(), DualNet())
+        model1_win_num, model2_win_num, _ = self_play(DualNet(), DualNet())
         print("model1_win_num: {} model2_win_num: {}".format(model1_win_num, model2_win_num))
     else:
         print('Usage error:', file=sys.stderr)
