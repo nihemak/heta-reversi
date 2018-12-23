@@ -608,9 +608,9 @@ def save_playdata(steps):
     with open(filename, 'a') as f:
         f.write("{}\n".format(json.dumps(playdata)))
 
-def play():
+def play(choice):
     while True:
-        steps = game(choice_human, ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(DualNet()))
+        steps = game(choice_human, choice)
         save_playdata(steps)
 
 def replay(steps_list):
@@ -622,8 +622,24 @@ def replay(steps_list):
 
 if __name__ == "__main__":
     args = sys.argv
-    if len(args) > 1 and args[1] == 'play':
-        play()
+    if len(args) > 1 and args[1] == 'play-random':
+        play(choice_random)
+    elif len(args) > 1 and args[1] == 'play-primitive-monte-carlo':
+        play(choice_primitive_monte_carlo)
+    elif len(args) > 1 and args[1] == 'play-mcts':
+        play(ChoiceMonteCarloTreeSearch())
+    elif len(args) > 1 and args[1] == 'play-sl-policy-network-random':
+        play(ChoiceSupervisedLearningPolicyNetwork(DualNet()))
+    elif len(args) > 2 and args[1] == 'play-sl-policy-network':
+        model = DualNet()
+        model.load(args[2])
+        play(ChoiceSupervisedLearningPolicyNetwork(model))
+    elif len(args) > 1 and args[1] == 'play-apv-mcts-random':
+        play(ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(DualNet()))
+    elif len(args) > 2 and args[1] == 'play-apv-mcts':
+        model = DualNet()
+        model.load(args[2])
+        play(ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model))
     elif len(args) > 2 and args[1] == 'replay':
         with open(args[2], 'r') as f:
             steps_list = f.readlines()
@@ -634,6 +650,12 @@ if __name__ == "__main__":
         print(model_filename)
     else:
         print('Usage error:', file=sys.stderr)
-        print(' - python main.py play', file=sys.stderr)
+        print(' - python main.py play-random', file=sys.stderr)
+        print(' - python main.py play-primitive-monte-carlo', file=sys.stderr)
+        print(' - python main.py play-mcts', file=sys.stderr)
+        print(' - python main.py play-sl-policy-network-random', file=sys.stderr)
+        print(' - python main.py play-sl-policy-network filepath-modeldata', file=sys.stderr)
+        print(' - python main.py play-apv-mcts-random', file=sys.stderr)
+        print(' - python main.py play-apv-mcts filepath-modeldata', file=sys.stderr)
         print(' - python main.py replay filepath-playdata', file=sys.stderr)
         print(' - python main.py train', file=sys.stderr)
