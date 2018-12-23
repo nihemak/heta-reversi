@@ -608,10 +608,48 @@ def save_playdata(steps):
     with open(filename, 'a') as f:
         f.write("{}\n".format(json.dumps(playdata)))
 
-def play():
+def yes_no_input(message):
+    yes = False
     while True:
-        steps = game(choice_human, ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(DualNet()))
+        try:
+            choice = input(message).lower()
+            if choice in ['y', 'ye', 'yes']:
+                yes = True
+                break
+            elif choice in ['n', 'no']:
+                break
+            else:
+                print("{} is invalid".format(choice))
+        except Exception:
+            print("{} is invalid".format(choice))
+    return yes
+
+def play(choice_computer):
+    choice1 = {
+        'name': "You",
+        'choice': choice_human
+    }
+    choice2 = {
+        'name': "Computer",
+        'choice': choice_computer
+    }
+    while True:
+        print("start: {} vs {}".format(choice1['name'], choice2['name']))
+
+        steps = game(choice1['choice'], choice2['choice'])
+
+        is_black_win = is_win_game(steps, is_black = True)
+        is_white_win = is_win_game(steps, is_black = False)
+        if is_black_win:
+            print("{} is win".format(choice1['name']))
+        elif is_white_win:
+            print("{} is win".format(choice2['name']))
+        else:
+            print("draw")
         save_playdata(steps)
+        if not yes_no_input("Do you want to continue? [y/N]: "):
+            break
+        choice1, choice2 = choice2, choice1
 
 def replay(steps_list):
     for steps in steps_list:
@@ -622,18 +660,47 @@ def replay(steps_list):
 
 if __name__ == "__main__":
     args = sys.argv
-    if len(args) > 1 and args[1] == 'play':
-        play()
+    if len(args) > 1 and args[1] == 'play-random':
+        play(choice_random)
+    elif len(args) > 1 and args[1] == 'play-primitive-monte-carlo':
+        play(choice_primitive_monte_carlo)
+    elif len(args) > 1 and args[1] == 'play-mcts':
+        play(ChoiceMonteCarloTreeSearch())
+    elif len(args) > 1 and args[1] == 'play-sl-policy-network-random':
+        play(ChoiceSupervisedLearningPolicyNetwork(DualNet()))
+    elif len(args) > 2 and args[1] == 'play-sl-policy-network':
+        model = DualNet()
+        model.load(args[2])
+        play(ChoiceSupervisedLearningPolicyNetwork(model))
+    elif len(args) > 1 and args[1] == 'play-apv-mcts-random':
+        play(ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(DualNet()))
+    elif len(args) > 2 and args[1] == 'play-apv-mcts':
+        model = DualNet()
+        model.load(args[2])
+        play(ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model))
     elif len(args) > 2 and args[1] == 'replay':
         with open(args[2], 'r') as f:
             steps_list = f.readlines()
             replay(steps_list)
-    elif len(args) > 1 and args[1] == 'train':
+    elif len(args) > 1 and args[1] == 'create-model':
         trainer = DualNetTrainer()
+        _, model_filename = trainer()
+        print(model_filename)
+    elif len(args) > 2 and args[1] == 'train-model':
+        model = DualNet()
+        model.load(args[2])
+        trainer = DualNetTrainer(model)
         _, model_filename = trainer()
         print(model_filename)
     else:
         print('Usage error:', file=sys.stderr)
-        print(' - python main.py play', file=sys.stderr)
+        print(' - python main.py play-random', file=sys.stderr)
+        print(' - python main.py play-primitive-monte-carlo', file=sys.stderr)
+        print(' - python main.py play-mcts', file=sys.stderr)
+        print(' - python main.py play-sl-policy-network-random', file=sys.stderr)
+        print(' - python main.py play-sl-policy-network filepath-modeldata', file=sys.stderr)
+        print(' - python main.py play-apv-mcts-random', file=sys.stderr)
+        print(' - python main.py play-apv-mcts filepath-modeldata', file=sys.stderr)
         print(' - python main.py replay filepath-playdata', file=sys.stderr)
-        print(' - python main.py train', file=sys.stderr)
+        print(' - python main.py create-model', file=sys.stderr)
+        print(' - python main.py train-model filepath-modeldata', file=sys.stderr)
