@@ -315,14 +315,10 @@ class ChoiceSupervisedLearningPolicyNetwork:
     def __init__(self, model):
         self.model = model
 
-    def get_policy_and_value(self, player):
-        policy, value = self.model(get_dualnet_input_data(player))
-        return policy, value
-
     def __call__(self, player):
         _, _, putable_position_nums = player
 
-        policy, _ = self.get_policy_and_value(player)
+        policy, _ = self.model(get_dualnet_input_data(player))
 
         putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
         indexs = np.where(putable_position_probabilities == putable_position_probabilities.max())[0]
@@ -334,7 +330,6 @@ class ChoiceSupervisedLearningPolicyNetwork:
 class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
     def __init__(self, model, is_strict_choice = True):
         self.model = model
-        self.sl = ChoiceSupervisedLearningPolicyNetwork(self.model)
         self.is_strict_choice = is_strict_choice
 
     def _get_node(self, player, position_num, probability):
@@ -351,7 +346,7 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
     def _get_initial_nodes(self, player):
         board, is_black, putable_position_nums = player
 
-        policy, value = self.sl.get_policy_and_value(player)
+        policy, value = self.model(get_dualnet_input_data(player))
 
         putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
         putable_position_probabilities /= putable_position_probabilities.sum()
