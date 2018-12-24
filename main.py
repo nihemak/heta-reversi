@@ -315,14 +315,10 @@ class ChoiceSupervisedLearningPolicyNetwork:
     def __init__(self, model):
         self.model = model
 
-    def get_policy_and_value(self, player):
-        policy, value = self.model(get_dualnet_input_data(player))
-        return policy, value
-
     def __call__(self, player):
         _, _, putable_position_nums = player
 
-        policy, _ = self.get_policy_and_value(player)
+        policy, _ = self.model(get_dualnet_input_data(player))
 
         putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
         indexs = np.where(putable_position_probabilities == putable_position_probabilities.max())[0]
@@ -332,9 +328,9 @@ class ChoiceSupervisedLearningPolicyNetwork:
         return choice_data
 
 class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
-    def __init__(self, model):
+    def __init__(self, model, is_strict_choice = True):
         self.model = model
-        self.sl = ChoiceSupervisedLearningPolicyNetwork(self.model)
+        self.is_strict_choice = is_strict_choice
 
     def _get_node(self, player, position_num, probability):
         return {
@@ -350,7 +346,7 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
     def _get_initial_nodes(self, player):
         board, is_black, putable_position_nums = player
 
-        policy, value = self.sl.get_policy_and_value(player)
+        policy, value = self.model(get_dualnet_input_data(player))
 
         putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
         putable_position_probabilities /= putable_position_probabilities.sum()
@@ -403,8 +399,15 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
 
     def _choice_node_index(self, nodes):
         try_nums = np.array([node['try_num'] for node in nodes])
-        indexs = np.where(try_nums == try_nums.max())[0]
-        index = np.random.choice(indexs)
+        try_nums_sum = try_nums.sum()
+        index = 0
+        if self.is_strict_choice or try_nums_sum == 0:
+            indexs = np.where(try_nums == try_nums.max())[0]
+            index = np.random.choice(indexs)
+        else:
+            try_nums = try_nums.astype(np.float32)
+            try_nums /= try_nums_sum  # to probability
+            index = np.random.choice(range(len(try_nums)), p = try_nums)
         return index
 
     def __call__(self, player, try_num = 1500):
@@ -455,15 +458,15 @@ class DualNetTrainer:
         with open(filename, 'a') as f:
             f.write("{}\n".format(json.dumps(self_playdata)))
 
-    def _self_play(self, model1, model2, try_num = 2500, is_save_data = True):
+    def _self_play(self, model1, model2, try_num = 2500, is_save_data = True, is_strict_choice = True):
         player1 = {
             'is_model1': True,
-            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1),
+            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1, is_strict_choice),
             'win_num': 0
         }
         player2 = {
             'is_model1': False,
-            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model2),
+            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model2, is_strict_choice),
             'win_num': 0
         }
         date_str   = datetime.date.today().strftime("%Y%m%d")
@@ -543,7 +546,7 @@ class DualNetTrainer:
 
     def __call__(self, try_num = 100):
         for i in range(try_num):
-            _, _, data_filename = self._self_play(self.model, self.model)
+            _, _, data_filename = self._self_play(self.model, self.model, is_strict_choice = False)
             steps_list = []
             with open(data_filename, 'r') as f:
                 steps_list = f.readlines()
