@@ -17,3 +17,15 @@ aws ec2 create-tags \
 aws ec2 attach-internet-gateway \
     --internet-gateway-id ${INTERNET_GATEWAY_ID} \
     --vpc-id ${VPC_ID}
+
+## Create Subnet
+SUBNET=$( \
+    aws ec2 create-subnet \
+        --vpc-id ${VPC_ID} \
+        --cidr-block 10.0.0.0/24 \
+        --availability-zone ap-northeast-1a)
+SUBNET_ID=$(echo ${SUBNET} | jq -r ".Subnet.SubnetId")
+aws ec2 create-tags \
+    --resources ${SUBNET_ID} \
+    --tags Key=Name,Value=test-batch
+aws ec2 modify-subnet-attribute --subnet-id ${SUBNET_ID} --map-public-ip-on-launch
