@@ -29,3 +29,19 @@ aws ec2 create-tags \
     --resources ${SUBNET_ID} \
     --tags Key=Name,Value=test-batch
 aws ec2 modify-subnet-attribute --subnet-id ${SUBNET_ID} --map-public-ip-on-launch
+
+## Create Route Table
+ROUTE_TABLE_ID=$( \
+    aws ec2 describe-route-tables \
+        --filters Name=vpc-id,Values=${VPC_ID} \
+             | jq -r ".RouteTables[].RouteTableId")
+aws ec2 create-tags \
+    --resources ${ROUTE_TABLE_ID} \
+    --tags Key=Name,Value=test-batch
+aws ec2 create-route \
+    --route-table-id ${ROUTE_TABLE_ID} \
+    --destination-cidr-block 0.0.0.0/0 \
+    --gateway-id ${INTERNET_GATEWAY_ID}
+aws ec2 associate-route-table \
+    --route-table-id ${ROUTE_TABLE_ID} \
+    --subnet-id ${SUBNET_ID}
