@@ -45,3 +45,9 @@ aws ec2 create-route \
 aws ec2 associate-route-table \
     --route-table-id ${ROUTE_TABLE_ID} \
     --subnet-id ${SUBNET_ID}
+
+## Security Group
+DEFAULT_SECURITY_GROUP_ID=$( \
+    aws ec2 describe-security-groups \
+        --filters Name=group-name,Values=default Name=vpc-id,Values=${VPC_ID} \
+            | jq -r '.SecurityGroups[].GroupId')
