@@ -1,5 +1,8 @@
 #!/bin/bash
 
+AWS_IDENTITY=$(aws sts get-caller-identity)
+AWS_ACCOUNT_ID=$(echo ${AWS_IDENTITY} | jq -r ".Account")
+
 ## Create VPC
 VPC=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16)
 VPC_ID=$(echo ${VPC} | jq -r ".Vpc.VpcId")
