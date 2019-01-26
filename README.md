@@ -57,6 +57,13 @@ $ export PYTHONIOENCODING=utf-8; python3 main.py replay data/playdata_xxxxxxxx.d
 $ export PYTHONIOENCODING=utf-8; python3 main.py create-model
 ```
 
+* create a trained dual network to s3 bucket  
+The procedure for building the AWS Batch environment is in `setup_batch.sh`.
+
+```bash
+$ export PYTHONIOENCODING=utf-8; python3 main.py create-model-batch "test-batch-bucket-name"
+```
+
 * training a dual network
 
 ```bash
