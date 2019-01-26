@@ -3,6 +3,13 @@
 AWS_IDENTITY=$(aws sts get-caller-identity)
 AWS_ACCOUNT_ID=$(echo ${AWS_IDENTITY} | jq -r ".Account")
 
+## Create CodeCommit
+aws codecommit create-repository --repository-name heta-reversi
+git clone --mirror https://github.com/nihemak/heta-reversi.git
+cd heta-reversi.git
+git push ssh://git-codecommit.ap-northeast-1.amazonaws.com/v1/repos/heta-reversi --all
+cd ..
+
 ## Create VPC
 VPC=$(aws ec2 create-vpc --cidr-block 10.0.0.0/16)
 VPC_ID=$(echo ${VPC} | jq -r ".Vpc.VpcId")
