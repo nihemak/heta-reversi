@@ -11,6 +11,17 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 from chainer import Variable, serializers
+import boto3
+
+# FIXME: Stop global variables by modularizing
+default_params = {
+    'choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num': 1500,
+    'dual_net_trainer_self_play_try_num':                                   2500,
+    'dual_net_trainer_create_new_model_epoch_num':                          100,
+    'dual_net_trainer_evaluation_try_num':                                  400,
+    'dual_net_trainer_evaluation_win_num':                                  220,
+    'dual_net_trainer_try_num':                                             100
+}
 
 def get_init_board():
     board = np.array([0] * 64, dtype=np.float32)
@@ -410,7 +421,9 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
             index = np.random.choice(range(len(try_nums)), p = try_nums)
         return index
 
-    def __call__(self, player, try_num = 1500):
+    def __call__(self, player, try_num = None):
+        try_num = default_params['choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num'] if try_num is None else try_num
+
         _, nodes = self._get_initial_nodes(player)
         for _ in range(try_num):
             nodes, node, path = self._selection_expansion(nodes)
@@ -458,7 +471,9 @@ class DualNetTrainer:
         with open(filename, 'a') as f:
             f.write("{}\n".format(json.dumps(self_playdata)))
 
-    def _self_play(self, model1, model2, try_num = 2500, is_save_data = True, is_strict_choice = True):
+    def _self_play(self, model1, model2, try_num = None, is_save_data = True, is_strict_choice = True):
+        try_num = default_params['dual_net_trainer_self_play_try_num'] if try_num is None else try_num
+
         player1 = {
             'is_model1': True,
             'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1, is_strict_choice),
@@ -524,7 +539,9 @@ class DualNetTrainer:
         y_train_value  = Variable(np.array(batch_y_value)).reshape(-1, 1)
         return x_train, y_train_policy, y_train_value
 
-    def _create_new_model(self, steps_list, epoch_num = 100, batch_size = 2048):
+    def _create_new_model(self, steps_list, epoch_num = None, batch_size = 2048):
+        epoch_num = default_params['dual_net_trainer_create_new_model_epoch_num'] if epoch_num is None else epoch_num
+
         model = DualNet()
         model.load(self.model_filename)
         optimizer = chainer.optimizers.Adam()
@@ -539,12 +556,17 @@ class DualNetTrainer:
             print("[new nodel] epoch: {} / {}, loss: {}".format(i + 1, epoch_num, loss))
         return model
 
-    def _evaluation(self, new_model):
-        _, new_model_win_num, _ = self._self_play(self.model, new_model, try_num = 400, is_save_data = False)
-        if new_model_win_num >= 220:
+    def _evaluation(self, new_model, try_num = None, win_num = None):
+        try_num = default_params['dual_net_trainer_evaluation_try_num'] if try_num is None else try_num
+        win_num = default_params['dual_net_trainer_evaluation_win_num'] if win_num is None else win_num
+
+        _, new_model_win_num, _ = self._self_play(self.model, new_model, try_num = try_num, is_save_data = False)
+        if new_model_win_num >= win_num:
             self._set_model(new_model)
 
-    def __call__(self, try_num = 100):
+    def __call__(self, try_num = None):
+        try_num = default_params['dual_net_trainer_try_num'] if try_num is None else try_num
+
         for i in range(try_num):
             _, _, data_filename = self._self_play(self.model, self.model, is_strict_choice = False)
             steps_list = []
@@ -688,6 +710,21 @@ if __name__ == "__main__":
     elif len(args) > 1 and args[1] == 'create-model':
         trainer = DualNetTrainer()
         _, model_filename = trainer()
+    elif len(args) > 2 and args[1] == 'create-model-batch':
+        bucket_name = args[2]
+
+        # FIXME: Stop global variables by modularizing
+        default_params['choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num'] = 150
+        default_params['dual_net_trainer_self_play_try_num']                                   = 25
+        default_params['dual_net_trainer_create_new_model_epoch_num']                          = 10
+        default_params['dual_net_trainer_evaluation_try_num']                                  = 40
+        default_params['dual_net_trainer_evaluation_win_num']                                  = 22
+        default_params['dual_net_trainer_try_num']                                             = 1
+
+        trainer = DualNetTrainer()
+        _, model_filename = trainer()
+        s3 = boto3.resource('s3')
+        s3.Bucket(bucket_name).upload_file(model_filename, model_filename)
         print(model_filename)
     elif len(args) > 2 and args[1] == 'train-model':
         model = DualNet()
@@ -706,4 +743,5 @@ if __name__ == "__main__":
         print(' - python main.py play-apv-mcts filepath-modeldata', file=sys.stderr)
         print(' - python main.py replay filepath-playdata', file=sys.stderr)
         print(' - python main.py create-model', file=sys.stderr)
+        print(' - python main.py create-model-batch bucket-name', file=sys.stderr)
         print(' - python main.py train-model filepath-modeldata', file=sys.stderr)

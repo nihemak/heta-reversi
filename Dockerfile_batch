@@ -1,0 +1,11 @@
+FROM chainer/chainer:v5.1.0-python3
+
+RUN pip3 install --upgrade pip
+RUN pip3 install boto3
+
+RUN mkdir -p /src
+ADD main.py /src
+
+RUN mkdir /data
+
+ENTRYPOINT export PYTHONIOENCODING=utf-8; python3 /src/main.py create-model-batch "test-batch-bucket-name"
