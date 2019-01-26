@@ -138,7 +138,7 @@ aws codebuild create-project --name test-batch-ecr \
                                --artifacts file://Artifacts.json \
                                --environment file://Environment.json \
                                --service-role ${ROLE_ECR_BUILD_ARN}
-CODEBUILD_ID=$(aws codebuild start-build --project-name test-batch-ecr --source-version add-batch | tr -d "\n" | jq -r '.build.id')
+CODEBUILD_ID=$(aws codebuild start-build --project-name test-batch-ecr --source-version master | tr -d "\n" | jq -r '.build.id')
 echo "started.. id is ${CODEBUILD_ID}"
 while true
 do
