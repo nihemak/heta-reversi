@@ -138,7 +138,7 @@ aws codebuild create-project --name test-batch-ecr \
                                --artifacts file://Artifacts.json \
                                --environment file://Environment.json \
                                --service-role ${ROLE_ECR_BUILD_ARN}
-CODEBUILD_ID=$(aws codebuild start-build --project-name test-batch-ecr | tr -d "\n" | jq -r '.build.id')
+CODEBUILD_ID=$(aws codebuild start-build --project-name test-batch-ecr --source-version add-batch | tr -d "\n" | jq -r '.build.id')
 echo "started.. id is ${CODEBUILD_ID}"
 while true
 do
@@ -261,10 +261,18 @@ JOB_DEF=$(aws batch register-job-definition \
   --job-definition-name test-job-definition \
   --type container \
   --container-properties file://job-definition.spec.json)
-JOB_DEF_ARN=$(echo $JOB_DEF | jq -r '.jobDefinitionArn')
+JOB_DEF_ARN=$(echo ${JOB_DEF} | jq -r '.jobDefinitionArn')
 
 ## Submit job
-aws batch submit-job \
+JOB=$(aws batch submit-job \
     --job-name "test-job" \
     --job-queue "${JOB_QUEUE_ARN}" \
-    --job-definition "${JOB_DEF_ARN}"
+    --job-definition "${JOB_DEF_ARN}")
+JOB_ID=$(echo ${JOB} | jq -r ".jobId")
+
+## Show job status
+aws batch describe-jobs --jobs ${JOB_ID} | jq -r ".jobs[].status"
+
+## Get model file
+aws s3 ls test-batch-bucket-name/data/
+aws s3 sync s3://test-batch-bucket-name/data .
