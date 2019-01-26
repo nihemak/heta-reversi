@@ -11,6 +11,7 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 from chainer import Variable, serializers
+import boto3
 
 def get_init_board():
     board = np.array([0] * 64, dtype=np.float32)
@@ -688,6 +689,12 @@ if __name__ == "__main__":
     elif len(args) > 1 and args[1] == 'create-model':
         trainer = DualNetTrainer()
         _, model_filename = trainer()
+    elif len(args) > 2 and args[1] == 'create-model-batch':
+        bucket_name = args[2]
+        trainer = DualNetTrainer()
+        _, model_filename = trainer()
+        s3 = boto3.resource('s3')
+        s3.Bucket(bucket_name).upload_file(model_filename, model_filename)
         print(model_filename)
     elif len(args) > 2 and args[1] == 'train-model':
         model = DualNet()
@@ -706,4 +713,5 @@ if __name__ == "__main__":
         print(' - python main.py play-apv-mcts filepath-modeldata', file=sys.stderr)
         print(' - python main.py replay filepath-playdata', file=sys.stderr)
         print(' - python main.py create-model', file=sys.stderr)
+        print(' - python main.py create-model-batch bucket-name', file=sys.stderr)
         print(' - python main.py train-model filepath-modeldata', file=sys.stderr)
