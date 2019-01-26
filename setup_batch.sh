@@ -153,3 +153,118 @@ do
   break
   fi
 done
+
+## Create Instance role
+cat <<EOF > Trust-Policy.json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "ec2.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+EOF
+aws iam create-role --role-name test-batch-instance \
+                    --assume-role-policy-document file://Trust-Policy.json
+aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role \
+                           --role-name test-batch-instance
+INSTANCE_ROLE=$(aws iam create-instance-profile --instance-profile-name test-batch-instance)
+INSTANCE_ROLE_ARN=$(echo ${INSTANCE_ROLE} | jq -r ".InstanceProfile.Arn")
+aws iam add-role-to-instance-profile --role-name test-batch-instance --instance-profile-name test-batch-instance
+
+## Create IAM ecr service role
+cat <<EOF > Trust-Policy.json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "batch.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+EOF
+ROLE_SERVICE=$(aws iam create-role --role-name test-batch-service \
+                                   --assume-role-policy-document file://Trust-Policy.json)
+aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole \
+                           --role-name test-batch-service
+ROLE_SERVICE_ARN=$(echo ${ROLE_SERVICE} |jq -r ".Role.Arn")
+
+## Create Batch compute environment
+cat << EOF > compute-environment.spec.json
+{
+    "computeEnvironmentName": "test-compute-environment",
+    "type": "MANAGED",
+    "state": "ENABLED",
+    "computeResources": {
+        "type": "EC2",
+        "minvCpus": 0,
+        "maxvCpus": 4,
+        "desiredvCpus": 0,
+        "instanceTypes": ["optimal"],
+        "subnets": ["${SUBNET_ID}"],
+        "securityGroupIds": ["${DEFAULT_SECURITY_GROUP_ID}"],
+        "instanceRole": "${INSTANCE_ROLE_ARN}"
+    },
+    "serviceRole": "${ROLE_SERVICE_ARN}"
+}
+EOF
+COMPUTE_ENV=$(aws batch create-compute-environment --cli-input-json file://compute-environment.spec.json)
+COMPUTE_ENV_ARN=$(echo ${COMPUTE_ENV} | jq -r '.computeEnvironmentArn')
+
+## Create Batch job queue
+JOB_QUEUE=$(aws batch create-job-queue \
+  --job-queue-name test-job-queue \
+  --priority 1 \
+  --compute-environment-order order=1,computeEnvironment=${COMPUTE_ENV_ARN})
+JOB_QUEUE_ARN=$(echo ${JOB_QUEUE} | jq -r '.jobQueueArn')
+
+## Create IAM job role
+cat <<EOF > Trust-Policy.json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+EOF
+ROLE_JOB=$(aws iam create-role --role-name test-batch-job \
+                               --assume-role-policy-document file://Trust-Policy.json)
+aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess \
+                           --role-name test-batch-job
+ROLE_JOB_ARN=$(echo ${ROLE_JOB} | jq -r ".Role.Arn")
+
+## Create job definition
+cat << EOF > job-definition.spec.json
+{
+  "image": "${ECR_REPO_URL}",
+  "vcpus": 4,
+  "memory": 2000,
+  "jobRoleArn": "${ROLE_JOB_ARN}"
+}
+EOF
+JOB_DEF=$(aws batch register-job-definition \
+  --job-definition-name test-job-definition \
+  --type container \
+  --container-properties file://job-definition.spec.json)
+JOB_DEF_ARN=$(echo $JOB_DEF | jq -r '.jobDefinitionArn')
+
+## Submit job
+aws batch submit-job \
+    --job-name "test-job" \
+    --job-queue "${JOB_QUEUE_ARN}" \
+    --job-definition "${JOB_DEF_ARN}"
