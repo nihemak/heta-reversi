@@ -149,8 +149,8 @@ do
     if [ "${STATUS}" != "SUCCEEDED" ]; then
       echo "faild."
     fi
-  echo "done."
-  break
+    echo "done."
+    break
   fi
 done
 
