@@ -287,7 +287,10 @@ cat << EOF > compute-environment.spec.json
         "minvCpus": 0,
         "maxvCpus": 4,
         "desiredvCpus": 0,
-        "instanceTypes": ["optimal"],
+        "instanceTypes": [
+          "p2.xlarge"
+        ],
+        "imageId": "${AMI_ID}",
         "subnets": ["${SUBNET_ID}"],
         "securityGroupIds": ["${DEFAULT_SECURITY_GROUP_ID}"],
         "instanceRole": "${INSTANCE_ROLE_ARN}"
