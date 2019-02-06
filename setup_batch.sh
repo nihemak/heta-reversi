@@ -3,6 +3,8 @@
 AWS_IDENTITY=$(aws sts get-caller-identity)
 AWS_ACCOUNT_ID=$(echo ${AWS_IDENTITY} | jq -r ".Account")
 
+BRANCH="master"
+
 ## Create CodeCommit
 aws codecommit create-repository --repository-name heta-reversi
 git clone --mirror https://github.com/nihemak/heta-reversi.git
@@ -138,7 +140,7 @@ aws codebuild create-project --name test-batch-ecr \
                                --artifacts file://Artifacts.json \
                                --environment file://Environment.json \
                                --service-role ${ROLE_ECR_BUILD_ARN}
-CODEBUILD_ID=$(aws codebuild start-build --project-name test-batch-ecr --source-version master | tr -d "\n" | jq -r '.build.id')
+CODEBUILD_ID=$(aws codebuild start-build --project-name test-batch-ecr --source-version ${BRANCH} | tr -d "\n" | jq -r '.build.id')
 echo "started.. id is ${CODEBUILD_ID}"
 while true
 do
@@ -212,7 +214,7 @@ aws codebuild create-project --name test-batch-ami \
                                --artifacts file://Artifacts.json \
                                --environment file://Environment.json \
                                --service-role ${ROLE_AMI_BUILD_ARN}
-CODEBUILD_ID=$(aws codebuild start-build --project-name test-batch-ami --source-version master | tr -d "\n" | jq -r '.build.id')
+CODEBUILD_ID=$(aws codebuild start-build --project-name test-batch-ami --source-version ${BRANCH} | tr -d "\n" | jq -r '.build.id')
 echo "started.. id is ${CODEBUILD_ID}"
 while true
 do
