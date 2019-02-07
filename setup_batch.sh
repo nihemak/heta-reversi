@@ -334,7 +334,7 @@ ROLE_JOB_ARN=$(echo ${ROLE_JOB} | jq -r ".Role.Arn")
 ## Create job definition
 cat << EOF > job-definition.spec.json
 {
-  "image": "${ECR_REPO_URL}",
+  "image": "${ECR_REPO_URL}:latest",
   "vcpus": 4,
   "memory": 2000,
   "jobRoleArn": "${ROLE_JOB_ARN}"
