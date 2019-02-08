@@ -276,7 +276,7 @@ ROLE_SERVICE=$(aws iam create-role --role-name test-batch-service \
                                    --assume-role-policy-document file://Trust-Policy.json)
 aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole \
                            --role-name test-batch-service
-ROLE_SERVICE_ARN=$(echo ${ROLE_SERVICE} |jq -r ".Role.Arn")
+ROLE_SERVICE_ARN=$(echo ${ROLE_SERVICE} | jq -r ".Role.Arn")
 
 ## Create Batch compute environment
 cat << EOF > compute-environment.spec.json
