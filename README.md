@@ -73,3 +73,6 @@ $ export PYTHONIOENCODING=utf-8; python3 main.py create-model data/model_xxxxxxx
 ```bash
 $ docker-compose down
 ```
+
+* create a trained dual network with AWS Batch  
+See [Setup Batch Environment](docs/setup_batch.md).
