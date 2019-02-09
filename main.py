@@ -11,6 +11,7 @@ import chainer
 import chainer.functions as F
 import chainer.links as L
 from chainer import Variable, serializers
+from chainer.backends import cuda
 import boto3
 
 # FIXME: Stop global variables by modularizing
@@ -22,6 +23,7 @@ default_params = {
     'dual_net_trainer_evaluation_win_num':                                  220,
     'dual_net_trainer_try_num':                                             100
 }
+gpu_device = -1
 
 def get_init_board():
     board = np.array([0] * 64, dtype=np.float32)
@@ -534,9 +536,14 @@ class DualNetTrainer:
             batch_x.append(x)
             batch_y_policy.append(y_policy)
             batch_y_value.append(y_value)
-        x_train        = Variable(np.array(batch_x)).reshape(-1, 4, 8, 8)
-        y_train_policy = Variable(np.array(batch_y_policy)).reshape(-1, 64)
-        y_train_value  = Variable(np.array(batch_y_value)).reshape(-1, 1)
+
+        xp = np
+        if gpu_device >= 0:
+            xp = cuda.cupy
+
+        x_train        = Variable(xp.array(batch_x)).reshape(-1, 4, 8, 8)
+        y_train_policy = Variable(xp.array(batch_y_policy)).reshape(-1, 64)
+        y_train_value  = Variable(xp.array(batch_y_value)).reshape(-1, 1)
         return x_train, y_train_policy, y_train_value
 
     def _create_new_model(self, steps_list, epoch_num = None, batch_size = 2048):
@@ -544,6 +551,11 @@ class DualNetTrainer:
 
         model = DualNet()
         model.load(self.model_filename)
+
+        if gpu_device >= 0:
+            cuda.get_device(gpu_device).use()
+            model.to_gpu(gpu_device)
+
         optimizer = chainer.optimizers.Adam()
         optimizer.setup(model)
         for i in range(epoch_num):
@@ -554,6 +566,10 @@ class DualNetTrainer:
             loss.backward()
             optimizer.update()
             print("[new nodel] epoch: {} / {}, loss: {}".format(i + 1, epoch_num, loss))
+
+        if gpu_device >= 0:
+            model.to_cpu()
+
         return model
 
     def _evaluation(self, new_model, try_num = None, win_num = None):
@@ -720,6 +736,7 @@ if __name__ == "__main__":
         default_params['dual_net_trainer_evaluation_try_num']                                  = 40
         default_params['dual_net_trainer_evaluation_win_num']                                  = 22
         default_params['dual_net_trainer_try_num']                                             = 1
+        gpu_device = 0
 
         trainer = DualNetTrainer()
         _, model_filename = trainer()
