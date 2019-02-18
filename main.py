@@ -16,12 +16,7 @@ import boto3
 
 # FIXME: Stop global variables by modularizing
 default_params = {
-    'choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num': 1500,
-    'dual_net_trainer_self_play_try_num':                                   2500,
-    'dual_net_trainer_create_new_model_epoch_num':                          100,
-    'dual_net_trainer_evaluation_try_num':                                  400,
-    'dual_net_trainer_evaluation_win_num':                                  220,
-    'dual_net_trainer_try_num':                                             100
+    'choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num': 1500
 }
 gpu_device = -1
 
@@ -454,9 +449,16 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
         return choice_data
 
 class DualNetTrainer:
-    def __init__(self, model = None):
+    def __init__(self, model = None, self_play_try_num = 2500, create_new_model_epoch_num = 100, evaluation_try_num = 400, evaluation_win_num = 220, try_num = 100):
         if model is None:
             model = DualNet()
+        self.default_params = {
+            'self_play_try_num': self_play_try_num,
+            'create_new_model_epoch_num': create_new_model_epoch_num,
+            'evaluation_try_num': evaluation_try_num,
+            'evaluation_win_num': evaluation_win_num,
+            'try_num': try_num
+        }
         self._set_model(model)
 
     def _set_model(self, model):
@@ -491,7 +493,7 @@ class DualNetTrainer:
             f.write("{}\n".format(json.dumps(self_playdata)))
 
     def _self_play(self, model1, model2, try_num = None, is_save_data = True, is_strict_choice = True):
-        try_num = default_params['dual_net_trainer_self_play_try_num'] if try_num is None else try_num
+        try_num = self.default_params['self_play_try_num'] if try_num is None else try_num
 
         player1 = {
             'is_model1': True,
@@ -564,7 +566,7 @@ class DualNetTrainer:
         return x_train, y_train_policy, y_train_value
 
     def _create_new_model(self, steps_list, epoch_num = None, batch_size = 2048):
-        epoch_num = default_params['dual_net_trainer_create_new_model_epoch_num'] if epoch_num is None else epoch_num
+        epoch_num = self.default_params['create_new_model_epoch_num'] if epoch_num is None else epoch_num
 
         model = DualNet()
         model.load(self.model_filename)
@@ -590,15 +592,15 @@ class DualNetTrainer:
         return model
 
     def _evaluation(self, new_model, try_num = None, win_num = None):
-        try_num = default_params['dual_net_trainer_evaluation_try_num'] if try_num is None else try_num
-        win_num = default_params['dual_net_trainer_evaluation_win_num'] if win_num is None else win_num
+        try_num = self.default_params['evaluation_try_num'] if try_num is None else try_num
+        win_num = self.default_params['evaluation_win_num'] if win_num is None else win_num
 
         _, new_model_win_num, _ = self._self_play(self.model, new_model, try_num = try_num, is_save_data = False)
         if new_model_win_num >= win_num:
             self._set_model(new_model)
 
     def __call__(self, try_num = None):
-        try_num = default_params['dual_net_trainer_try_num'] if try_num is None else try_num
+        try_num = self.default_params['try_num'] if try_num is None else try_num
 
         for i in range(try_num):
             _, _, data_filename = self._self_play(self.model, self.model, is_strict_choice = False)
@@ -748,14 +750,15 @@ if __name__ == "__main__":
 
         # FIXME: Stop global variables by modularizing
         default_params['choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num'] = 150
-        default_params['dual_net_trainer_self_play_try_num']                                   = 25
-        default_params['dual_net_trainer_create_new_model_epoch_num']                          = 10
-        default_params['dual_net_trainer_evaluation_try_num']                                  = 40
-        default_params['dual_net_trainer_evaluation_win_num']                                  = 22
-        default_params['dual_net_trainer_try_num']                                             = 1
         gpu_device = 0
 
-        trainer = DualNetTrainer()
+        trainer = DualNetTrainer(
+            self_play_try_num = 25,
+            create_new_model_epoch_num = 10,
+            evaluation_try_num = 40,
+            evaluation_win_num = 22,
+            try_num = 1
+        )
         _, model_filename = trainer()
         s3 = boto3.resource('s3')
         s3.Bucket(bucket_name).upload_file(model_filename, model_filename)
