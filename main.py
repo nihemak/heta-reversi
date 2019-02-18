@@ -18,7 +18,6 @@ import boto3
 default_params = {
     'choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num': 1500
 }
-gpu_device = -1
 
 class Reversi:
     @classmethod
@@ -449,7 +448,7 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
         return choice_data
 
 class DualNetTrainer:
-    def __init__(self, model = None, self_play_try_num = 2500, create_new_model_epoch_num = 100, evaluation_try_num = 400, evaluation_win_num = 220, try_num = 100):
+    def __init__(self, model = None, self_play_try_num = 2500, create_new_model_epoch_num = 100, evaluation_try_num = 400, evaluation_win_num = 220, try_num = 100, gpu_device = -1):
         if model is None:
             model = DualNet()
         self.default_params = {
@@ -459,6 +458,7 @@ class DualNetTrainer:
             'evaluation_win_num': evaluation_win_num,
             'try_num': try_num
         }
+        self.gpu_device = gpu_device
         self._set_model(model)
 
     def _set_model(self, model):
@@ -557,7 +557,7 @@ class DualNetTrainer:
             batch_y_value.append(y_value)
 
         xp = np
-        if gpu_device >= 0:
+        if self.gpu_device >= 0:
             xp = cuda.cupy
 
         x_train        = Variable(xp.array(batch_x)).reshape(-1, 4, 8, 8)
@@ -571,9 +571,9 @@ class DualNetTrainer:
         model = DualNet()
         model.load(self.model_filename)
 
-        if gpu_device >= 0:
-            cuda.get_device(gpu_device).use()
-            model.to_gpu(gpu_device)
+        if self.gpu_device >= 0:
+            cuda.get_device(self.gpu_device).use()
+            model.to_gpu(self.gpu_device)
 
         optimizer = chainer.optimizers.Adam()
         optimizer.setup(model)
@@ -586,7 +586,7 @@ class DualNetTrainer:
             optimizer.update()
             print("[new nodel] epoch: {} / {}, loss: {}".format(i + 1, epoch_num, loss))
 
-        if gpu_device >= 0:
+        if self.gpu_device >= 0:
             model.to_cpu()
 
         return model
@@ -750,14 +750,14 @@ if __name__ == "__main__":
 
         # FIXME: Stop global variables by modularizing
         default_params['choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num'] = 150
-        gpu_device = 0
 
         trainer = DualNetTrainer(
             self_play_try_num = 25,
             create_new_model_epoch_num = 10,
             evaluation_try_num = 40,
             evaluation_win_num = 22,
-            try_num = 1
+            try_num = 1,
+            gpu_device = 0
         )
         _, model_filename = trainer()
         s3 = boto3.resource('s3')
