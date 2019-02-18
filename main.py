@@ -163,18 +163,6 @@ class Reversi:
         board, _, _ = player
         return cls.is_end_board(board) or (cls.is_pass_last_put(game) and not cls.is_putable(player)) 
 
-def get_dualnet_input_data(player):
-    board, is_black, putable_position_nums = player
-
-    mine    = np.array([1 if (is_black and v == 1) or (not is_black and v == -1) else 0 for v in board], dtype=np.float32)
-    yours   = np.array([1 if (is_black and v == -1) or (not is_black and v == 1) else 0 for v in board], dtype=np.float32)
-    blank   = np.array([1 if v == 0 else 0 for v in board], dtype=np.float32)
-    putable = np.array([1 if i in putable_position_nums else 0 for i in range(64)], dtype=np.float32)
-
-    # 64 + 64 + 64 + 64
-    x = np.concatenate((mine, yours, blank, putable)).reshape((1, 4, 8, 8))
-    return x
-
 class DualNet(chainer.Chain):
     def __init__(self):
         super(DualNet, self).__init__()
@@ -222,6 +210,19 @@ class DualNet(chainer.Chain):
 
     def save(self, filename):
         serializers.save_npz(filename, self)
+
+    @classmethod
+    def get_input_data(cls, player):
+        board, is_black, putable_position_nums = player
+
+        mine    = np.array([1 if (is_black and v == 1) or (not is_black and v == -1) else 0 for v in board], dtype=np.float32)
+        yours   = np.array([1 if (is_black and v == -1) or (not is_black and v == 1) else 0 for v in board], dtype=np.float32)
+        blank   = np.array([1 if v == 0 else 0 for v in board], dtype=np.float32)
+        putable = np.array([1 if i in putable_position_nums else 0 for i in range(64)], dtype=np.float32)
+
+        # 64 + 64 + 64 + 64
+        x = np.concatenate((mine, yours, blank, putable)).reshape((1, 4, 8, 8))
+        return x
 
 class ChoiceReplaySteps:
     def __init__(self, steps):
@@ -347,7 +348,7 @@ class ChoiceSupervisedLearningPolicyNetwork:
     def __call__(self, player):
         _, _, putable_position_nums = player
 
-        policy, _ = self.model(get_dualnet_input_data(player))
+        policy, _ = self.model(DualNet.get_input_data(player))
 
         putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
         indexs = np.where(putable_position_probabilities == putable_position_probabilities.max())[0]
@@ -375,7 +376,7 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
     def _get_initial_nodes(self, player):
         board, is_black, putable_position_nums = player
 
-        policy, value = self.model(get_dualnet_input_data(player))
+        policy, value = self.model(DualNet.get_input_data(player))
 
         putable_position_probabilities = np.array([policy[0].data[num] for num in putable_position_nums])
         putable_position_probabilities /= putable_position_probabilities.sum()
@@ -533,7 +534,7 @@ class DualNetTrainer:
         choice2 = ChoiceReplaySteps(np.array(position_nums, dtype=np.int32)[1::2])
         steps = game(choice1, choice2, is_render = False, limit_step_num = step_num)
         player, _ = steps[-1]
-        x = get_dualnet_input_data(player)
+        x = DualNet.get_input_data(player)
         return x
 
     def _get_train_random(self, steps_list):
