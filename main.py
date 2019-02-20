@@ -14,11 +14,6 @@ from chainer import Variable, serializers
 from chainer.backends import cuda
 import boto3
 
-# FIXME: Stop global variables by modularizing
-default_params = {
-    'choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num': 1500
-}
-
 class Reversi:
     @classmethod
     def get_init_board(cls):
@@ -352,9 +347,12 @@ class ChoiceSupervisedLearningPolicyNetwork:
         return choice_data
 
 class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
-    def __init__(self, model, is_strict_choice = True):
+    def __init__(self, model, is_strict_choice = True, try_num = 1500):
         self.model = model
         self.is_strict_choice = is_strict_choice
+        self.default_params = {
+            'try_num': try_num
+        }
 
     def _get_node(self, player, position_num, probability):
         return {
@@ -435,7 +433,7 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
         return index
 
     def __call__(self, player, try_num = None):
-        try_num = default_params['choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num'] if try_num is None else try_num
+        try_num = self.default_params['try_num'] if try_num is None else try_num
 
         _, nodes = self._get_initial_nodes(player)
         for _ in range(try_num):
@@ -448,7 +446,7 @@ class ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch:
         return choice_data
 
 class DualNetTrainer:
-    def __init__(self, model = None, self_play_try_num = 2500, create_new_model_epoch_num = 100, evaluation_try_num = 400, evaluation_win_num = 220, try_num = 100, gpu_device = -1):
+    def __init__(self, model = None, self_play_try_num = 2500, create_new_model_epoch_num = 100, evaluation_try_num = 400, evaluation_win_num = 220, try_num = 100, apv_mcts_try_num = 1500, gpu_device = -1):
         if model is None:
             model = DualNet()
         self.default_params = {
@@ -456,7 +454,8 @@ class DualNetTrainer:
             'create_new_model_epoch_num': create_new_model_epoch_num,
             'evaluation_try_num': evaluation_try_num,
             'evaluation_win_num': evaluation_win_num,
-            'try_num': try_num
+            'try_num': try_num,
+            'apv_mcts_try_num': apv_mcts_try_num
         }
         self.gpu_device = gpu_device
         self._set_model(model)
@@ -497,12 +496,12 @@ class DualNetTrainer:
 
         player1 = {
             'is_model1': True,
-            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1, is_strict_choice),
+            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model1, is_strict_choice, try_num = self.default_params['apv_mcts_try_num']),
             'win_num': 0
         }
         player2 = {
             'is_model1': False,
-            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model2, is_strict_choice),
+            'choice': ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model2, is_strict_choice, try_num = self.default_params['apv_mcts_try_num']),
             'win_num': 0
         }
         date_str   = datetime.date.today().strftime("%Y%m%d")
@@ -748,15 +747,13 @@ if __name__ == "__main__":
     elif len(args) > 2 and args[1] == 'create-model-batch':
         bucket_name = args[2]
 
-        # FIXME: Stop global variables by modularizing
-        default_params['choice_asynchronous_policy_and_value_monte_carlo_tree_search_try_num'] = 150
-
         trainer = DualNetTrainer(
             self_play_try_num = 25,
             create_new_model_epoch_num = 10,
             evaluation_try_num = 40,
             evaluation_win_num = 22,
             try_num = 1,
+            apv_mcts_try_num = 150,
             gpu_device = 0
         )
         _, model_filename = trainer()
