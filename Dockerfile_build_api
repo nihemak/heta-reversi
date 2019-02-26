@@ -1,0 +1,6 @@
+FROM chainer/chainer:v5.1.0-python3
+
+RUN apt-get update
+RUN apt-get install -y nodejs
+RUN apt-get install -y npm
+RUN update-alternatives --install /usr/bin/node node /usr/bin/nodejs 10
