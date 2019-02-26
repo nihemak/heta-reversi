@@ -12,6 +12,9 @@ provider:
   deploymentBucket:
     name: ${env:DEPLOY_BUCKET}
 
+plugins:
+  - serverless-python-requirements
+
 functions:
   hello:
     handler: handler.hello

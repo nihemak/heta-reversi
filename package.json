@@ -1,0 +1,27 @@
+{
+  "name": "heta-reversi",
+  "version": "0.0.0",
+  "description": "heta-reversi api",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "test"
+  },
+  "dependencies": {
+    "serverless-python-requirements": "^4.3.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nihemak/heta-reversi.git"
+  },
+  "author": "Makoto Nihei <nihemak@gmail.com> (https://github.com/nihemak)",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/nihemak/heta-reversi/issues"
+  },
+  "homepage": "https://github.com/nihemak/heta-reversi#readme"
+}

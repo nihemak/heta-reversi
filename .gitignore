@@ -17,6 +17,7 @@ var/
 *.egg
 data/*
 .vscode
+node_modules
 
 # Serverless directories
 .serverless
