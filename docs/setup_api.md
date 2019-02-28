@@ -6,6 +6,26 @@
 ECR_REPO_NAME="heta-reversi-build-api"
 ECR_REPO=$(aws ecr create-repository --repository-name ${ECR_REPO_NAME})
 ECR_REPO_URL=$(echo ${ECR_REPO} | jq -r ".repository.repositoryUri")
+cat <<EOF > ecr_policy.json
+{
+    "Version": "2008-10-17",
+    "Statement": [
+        {
+            "Sid": "CodeBuildAccess",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "codebuild.amazonaws.com"
+            },
+            "Action": [
+                "ecr:GetDownloadUrlForLayer",
+                "ecr:BatchGetImage",
+                "ecr:BatchCheckLayerAvailability"
+            ]
+        }
+    ]
+}
+EOF
+aws ecr set-repository-policy --repository-name ${ECR_REPO_NAME} --policy-text file://ecr_policy.json
 ```
 
 ## Create IAM ecr build role of build api
@@ -82,7 +102,7 @@ aws codebuild create-project --name heta-reversi-build-api-batch-ecr \
                                --environment file://Environment.json \
                                --service-role ${ROLE_ECR_BUILD_ARN}
 BRANCH="master"
-CODEBUILD_ID=$(aws codebuild start-build --project-name test-batch-ecr --source-version ${BRANCH} | tr -d "\n" | jq -r '.build.id')
+CODEBUILD_ID=$(aws codebuild start-build --project-name heta-reversi-build-api-batch-ecr --source-version ${BRANCH} | tr -d "\n" | jq -r '.build.id')
 echo "started.. id is ${CODEBUILD_ID}"
 while true
 do
