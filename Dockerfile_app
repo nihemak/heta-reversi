@@ -1,0 +1,10 @@
+FROM chainer/chainer:v5.1.0-python3
+
+COPY . /app
+WORKDIR /app
+
+RUN pip3 install --upgrade pip
+RUN pip3 install Flask==1.0.2
+
+ENTRYPOINT ["python3"]
+CMD ["app.py"]
