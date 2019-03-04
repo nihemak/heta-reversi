@@ -126,36 +126,39 @@ aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/Ama
                            --role-name heta-reversi-ecsTaskExecutionRole
 ROLE_ECS_TASK_EXEC_ARN=$(echo ${ROLE_ECS_TASK_EXEC} | jq -r ".Role.Arn")
 
+aws logs create-log-group --log-group-name /ecs/heta-reversi
+
 cat <<EOF > task_definition.json
 {
-      "family": "heta-reversi",
-      "containerDefinitions": [
-      {
-              "name": "heta-reversi",
-              "image": "${IMAGE_REPO_URI}:latest",
-              "cpu": 0,
-              "portMappings": [{
-                      "containerPort": 5000,
-                      "hostPort": 5000,
-		      "protocol": "tcp"
-              }],
-              "essential": true,
-              "logConfiguration": {
-                    "logDriver": "awslogs",
-                    "options": {
-                        "awslogs-stream-prefix": "ecs",
-                        "awslogs-region": "ap-northeast-1",
-                        "awslogs-group": "/ecs/heta-reversi"
-                    }
-              }
-      }],
-      "cpu": "256",
-      "memory": "512",
-      "networkMode": "awsvpc",
-      "executionRoleArn": "${ROLE_ECS_TASK_EXEC_ARN}",
-      "requiresCompatibilities": [
-            "FARGATE"
-        ]
+    "family": "heta-reversi",
+    "containerDefinitions": [
+        {
+            "name": "heta-reversi",
+            "image": "${IMAGE_REPO_URI}:latest",
+            "cpu": 0,
+            "portMappings": [{
+                "containerPort": 5000,
+                "hostPort": 5000,
+		            "protocol": "tcp"
+            }],
+            "essential": true,
+            "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                    "awslogs-stream-prefix": "ecs",
+                    "awslogs-region": "ap-northeast-1",
+                    "awslogs-group": "/ecs/heta-reversi"
+                }
+            }
+        }
+    ],
+    "cpu": "256",
+    "memory": "512",
+    "networkMode": "awsvpc",
+    "executionRoleArn": "${ROLE_ECS_TASK_EXEC_ARN}",
+    "requiresCompatibilities": [
+        "FARGATE"
+    ]
 }
 EOF
 aws ecs register-task-definition --cli-input-json file://task_definition.json
@@ -175,21 +178,21 @@ cat <<EOF > service_define.json
     "launchType": "FARGATE",
     "platformVersion": "LATEST",
     "deploymentConfiguration": {
-                "minimumHealthyPercent": 100,
-                "maximumPercent": 200
+        "minimumHealthyPercent": 100,
+        "maximumPercent": 200
     },
     "networkConfiguration": {
-                "awsvpcConfiguration": {
-                    "securityGroups": [
-                        "${SECURITY_GROUP_ID}"
-                    ],
-                    "subnets": [
-                        "${SUBNET_ID}"
-                    ],
-                    "assignPublicIp": "ENABLED"
-                }
-     },
-     "schedulingStrategy": "REPLICA"
+        "awsvpcConfiguration": {
+            "securityGroups": [
+                "${SECURITY_GROUP_ID}"
+            ],
+            "subnets": [
+                "${SUBNET_ID}"
+            ],
+            "assignPublicIp": "ENABLED"
+        }
+    },
+    "schedulingStrategy": "REPLICA"
 }
 EOF
 aws ecs create-service --service-name heta-reversi_app --cli-input-json file://service_define.json
