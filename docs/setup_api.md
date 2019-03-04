@@ -99,6 +99,102 @@ do
 done
 ```
 
+## Create ECS
+
+```bash
+aws ecs create-cluster --cluster-name heta-reversi
+
+IMAGE_REPO_URI=$(aws ecr describe-repositories --repository-name heta-reversi-app | jq -r '.repositories[].repositoryUri')
+
+cat <<EOF > Trust-Policy.json
+{
+    "Version": "2008-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "ecs-tasks.amazonaws.com"
+            },
+            "Action": "sts:AssumeRole"
+        }
+    ]
+}
+EOF
+ROLE_ECS_TASK_EXEC=$(aws iam create-role --role-name heta-reversi-ecsTaskExecutionRole \
+                                     --assume-role-policy-document file://Trust-Policy.json)
+aws iam attach-role-policy --policy-arn arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy \
+                           --role-name heta-reversi-ecsTaskExecutionRole
+ROLE_ECS_TASK_EXEC_ARN=$(echo ${ROLE_ECS_TASK_EXEC} | jq -r ".Role.Arn")
+
+cat <<EOF > task_definition.json
+{
+      "family": "heta-reversi",
+      "containerDefinitions": [
+      {
+              "name": "heta-reversi",
+              "image": "${IMAGE_REPO_URI}:latest",
+              "cpu": 0,
+              "portMappings": [{
+                      "containerPort": 5000,
+                      "hostPort": 5000,
+		      "protocol": "tcp"
+              }],
+              "essential": true,
+              "logConfiguration": {
+                    "logDriver": "awslogs",
+                    "options": {
+                        "awslogs-stream-prefix": "ecs",
+                        "awslogs-region": "ap-northeast-1",
+                        "awslogs-group": "/ecs/heta-reversi"
+                    }
+              }
+      }],
+      "cpu": "256",
+      "memory": "512",
+      "networkMode": "awsvpc",
+      "executionRoleArn": "${ROLE_ECS_TASK_EXEC_ARN}",
+      "requiresCompatibilities": [
+            "FARGATE"
+        ]
+}
+EOF
+aws ecs register-task-definition --cli-input-json file://task_definition.json
+
+VPC_ID=$(aws ec2 describe-vpcs --filters Name=tag:Name,Values=test-batch | jq -r '.Vpcs[].VpcId')
+SECURITY_GROUP_ID=$(aws ec2 create-security-group --group-name app-sg --description "app-sg" --vpc-id ${VPC_ID} | jq -r '.GroupId')
+aws ec2 authorize-security-group-ingress --group-id $SECURITY_GROUP_ID --protocol tcp --port 5000 --cidr 0.0.0.0/0
+
+SUBNET_ID=$(aws ec2 describe-subnets --filters Name=tag:Name,Values=test-batch | jq -r '.Subnets[].SubnetId')
+
+cat <<EOF > service_define.json
+{
+    "cluster": "heta-reversi",
+    "serviceName": "heta-reversi_app",
+    "taskDefinition": "heta-reversi",
+    "desiredCount": 1,
+    "launchType": "FARGATE",
+    "platformVersion": "LATEST",
+    "deploymentConfiguration": {
+                "minimumHealthyPercent": 100,
+                "maximumPercent": 200
+    },
+    "networkConfiguration": {
+                "awsvpcConfiguration": {
+                    "securityGroups": [
+                        "${SECURITY_GROUP_ID}"
+                    ],
+                    "subnets": [
+                        "${SUBNET_ID}"
+                    ],
+                    "assignPublicIp": "ENABLED"
+                }
+     },
+     "schedulingStrategy": "REPLICA"
+}
+EOF
+aws ecs create-service --service-name heta-reversi_app --cli-input-json file://service_define.json
+```
+
 ## Create ECR repository of build api
 
 ```bash
