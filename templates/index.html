@@ -45,11 +45,17 @@
             Current player: <span id="current-player-name">{% if is_black %}black{% else %}white{% endif %}</span>
         </div>
         <div id="message">
-            Please click position
+            {% if not is_end_board %}
+                Please click position
+            {% elif black_num > white_num %}
+                You win
+            {% else %}
+                Computer win
+            {% endif %}
         </div>
         <div id="console">
             {% for num in putable_position_nums %}
-                <a class="btn btn-default" href="#" role="button">{{ chr(97 + int((num + 1) / 8)) }}{{ (num % 8) + 1 }}</a>
+                <a class="btn btn-default" href="/?query={{ base64.urlsafe_b64encode(json.dumps({'board': board.tolist(), 'num': num}).encode()).decode() }}" role="button">{{ chr(97 + int(num % 8)) }}{{ int(num / 8) + 1 }}</a>
             {% endfor %}
         </div>
     </div>
