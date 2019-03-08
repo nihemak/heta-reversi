@@ -7,7 +7,7 @@ import sys
 import boto3
 
 from Reversi import choice_random, Reversi
-from Choice import DualNet, ChoiceReplaySteps, choice_primitive_monte_carlo, ChoiceMonteCarloTreeSearch, ChoiceSupervisedLearningPolicyNetwork, ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch, DualNetTrainer, choice_human
+from Reversi import DualNet, ChoiceReplaySteps, choice_primitive_monte_carlo, ChoiceMonteCarloTreeSearch, ChoiceSupervisedLearningPolicyNetwork, ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch, DualNetTrainer, choice_human
 
 def save_playdata(steps):
     playdata = []
