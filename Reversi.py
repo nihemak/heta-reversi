@@ -2,6 +2,11 @@
 
 import numpy as np
 
+def choice_random(player):
+    _, _, putable_position_nums = player
+    choice_data = { 'position_num': np.random.choice(putable_position_nums) }
+    return choice_data
+
 class Reversi:
     @classmethod
     def get_init_board(cls):

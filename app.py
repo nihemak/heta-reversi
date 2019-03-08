@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request
-from Reversi import Reversi
+from Reversi import choice_random, Reversi
 import base64
 import json
 import numpy as np
@@ -21,8 +21,8 @@ def index():
         while True:
             player = Reversi.get_player(board, False)
             if Reversi.is_putable(player):
-                _, _, putable_position_nums = player
-                board = Reversi.put(player, np.random.choice(putable_position_nums))
+                choice_data = choice_random(player)
+                board = Reversi.put(player, choice_data['position_num'])
                 player = Reversi.get_player(board)
                 if Reversi.is_putable(player):
                     break
