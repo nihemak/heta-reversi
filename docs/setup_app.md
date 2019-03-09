@@ -1,4 +1,4 @@
-# Setup API Environment
+# Setup APP Environment
 
 ## Create ECR repository of app
 
