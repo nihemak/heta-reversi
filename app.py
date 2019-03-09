@@ -3,6 +3,7 @@ from Reversi import Reversi
 from Reversi import choice_random
 from Reversi import choice_primitive_monte_carlo
 from Reversi import ChoiceMonteCarloTreeSearch
+from Reversi import DualNet, ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch
 import base64
 import json
 import numpy as np
@@ -24,6 +25,12 @@ def primitive_monte_carlo():
 @app.route('/mcts')
 def mcts():
     return next('/mcts', ChoiceMonteCarloTreeSearch(), 'monte carlo tree search')
+
+@app.route('/apv-mcts')
+def apv_mcts():
+    model = DualNet()
+    model.load('data/model.dat')
+    return next('/apv-mcts', ChoiceAsynchronousPolicyAndValueMonteCarloTreeSearch(model), 'asynchronous policy and value monte carlo tree search')
 
 def next(url, choice, algorithm):
     board = Reversi.get_init_board()
