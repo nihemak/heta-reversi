@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Reversi</title>
+    <title>Reversi(vs {{ algorithm }})</title>
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
@@ -19,6 +19,18 @@
   </head>
   <body>
     <div id="main" class="container">
+        <div id="current-player">
+            Current player: <span id="current-player-name">{% if is_black %}black{% else %}white{% endif %}</span>
+        </div>
+        <div id="message">
+            {% if not is_end_board %}
+                Please click position
+            {% elif black_num > white_num %}
+                You win
+            {% else %}
+                Computer win
+            {% endif %}
+        </div>
         <div id="board">
             <table>
                 <tr>
@@ -32,8 +44,12 @@
                     <tr>
                         <th>{{ i+1 }}</th>
                         {% for j in range(8) %}
-                            <td class="cell {% if board[(i * 8) + j] == 1 %}black{% elif board[(i * 8) + j] == -1 %}white{% else %}empty{% endif %}">
-                                <span class="disc"></span>
+                            <td class="cell {% if board[(i * 8) + j] == 1 %}black{% elif board[(i * 8) + j] == -1 %}white{% elif ((i * 8) + j) in putable_position_nums %}puttable{% else %}empty{% endif %}">
+                                {% if ((i * 8) + j) in putable_position_nums %}
+                                    <a class="disc" href="{{ url }}?query={{ base64.urlsafe_b64encode(json.dumps({'board': board.tolist(), 'num': ((i * 8) + j)}).encode()).decode() }}"></a>
+                                {% else %}
+                                    <span class="disc"></span>
+                                {% endif %}
                             </td>
                         {% endfor %}
                         <th></th>
@@ -41,22 +57,12 @@
                 {% endfor %}
             </table>
         </div>
-        <div id="current-player">
-            Current player: <span id="current-player-name">{% if is_black %}black{% else %}white{% endif %}</span>
-        </div>
-        <div id="message">
-            {% if not is_end_board %}
-                Please click position
-            {% elif black_num > white_num %}
-                You win
-            {% else %}
-                Computer win
-            {% endif %}
-        </div>
-        <div id="console">
-            {% for num in putable_position_nums %}
-                <a class="btn btn-default" href="{{ url }}?query={{ base64.urlsafe_b64encode(json.dumps({'board': board.tolist(), 'num': num}).encode()).decode() }}" role="button">{{ chr(97 + int(num % 8)) }}{{ int(num / 8) + 1 }}</a>
-            {% endfor %}
+        <div class="console">
+            <ul>
+                <li><a href="/">reset to vs random</a></li>
+                <li><a href="/primitive-monte-carlo">reset to vs primitive monte carlo</a></li>
+                <li><a href="/mcts">reset to vs monte carlo tree search</a></li>
+            </ul>
         </div>
     </div>
 

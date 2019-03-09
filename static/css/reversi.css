@@ -36,6 +36,10 @@
 {
   background: #000;
 }
+#board > table .cell.puttable > .disc
+{
+  border: 3px solid #f00;
+}
 #console > .btn
 {
     border: solid #000;

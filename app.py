@@ -15,17 +15,17 @@ app.jinja_env.globals.update(json=json)
 
 @app.route('/')
 def random():
-    return next('/', choice_random)
+    return next('/', choice_random, 'random')
 
 @app.route('/primitive-monte-carlo')
 def primitive_monte_carlo():
-    return next('/primitive-monte-carlo', choice_primitive_monte_carlo)
+    return next('/primitive-monte-carlo', choice_primitive_monte_carlo, 'primitive monte carlo')
 
 @app.route('/mcts')
 def mcts():
-    return next('/mcts', ChoiceMonteCarloTreeSearch())
+    return next('/mcts', ChoiceMonteCarloTreeSearch(), 'monte carlo tree search')
 
-def next(url, choice):
+def next(url, choice, algorithm):
     board = Reversi.get_init_board()
     query = request.args.get('query')
     if query:
@@ -46,7 +46,7 @@ def next(url, choice):
     board, is_black, putable_position_nums = Reversi.get_player(board)
     black_num, white_num = Reversi.get_stone_num(board)
     return render_template('index.html',
-                           url=url, is_end_board=Reversi.is_end_board(board), black_num=black_num, white_num=white_num, board=board, is_black=is_black, putable_position_nums=putable_position_nums)
+                           url=url, algorithm=algorithm, is_end_board=Reversi.is_end_board(board), black_num=black_num, white_num=white_num, board=board, is_black=is_black, putable_position_nums=putable_position_nums)
 
 if __name__ == '__main__':
-    app.run(debug=True,host='0.0.0.0')
+    app.run(debug=True, host='0.0.0.0')
