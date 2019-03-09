@@ -72,6 +72,11 @@ cat <<EOF > Environment.json
       "name": "ECR_REPO_URL",
       "value": "${ECR_REPO_URL}",
       "type": "PLAINTEXT"
+    },
+    {
+      "name": "MODEL_BUCKET",
+      "value": "test-batch-bucket-name",
+      "type": "PLAINTEXT"
     }
   ]
 }

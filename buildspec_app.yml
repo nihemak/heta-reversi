@@ -5,6 +5,14 @@ phases:
     commands:
       - echo "Logging in to Amazon ECR..."
       - $(aws ecr get-login --no-include-email --region ${REGION})
+      - cd data
+      - aws s3 sync s3://${MODEL_BUCKET}/data/ ./
+      - MODEL_FILE=$(ls -lt model_*.dat | head -n 1 | awk '{print $9}')
+      - echo $MODEL_FILE
+      - mv $MODEL_FILE model.dat
+      - rm model_*.dat
+      - ls -l
+      - cd ..
   build:
     commands:
       - echo "Build started on $(date)"
