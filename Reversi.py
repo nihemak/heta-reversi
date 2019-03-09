@@ -34,13 +34,14 @@ class Reversi:
         row    += row_add
         column += column_add
         exists = False
+        valid  = False
         while row >= 0 and row < 8 and column >= 0 and column < 8:
             position_num = row * 8 + column
 
             if exists == True and board[position_num] == own:
+                valid = True
                 break
             if board[position_num] != pair:
-                position_nums = []
                 break
 
             position_nums.append(position_num)
@@ -48,6 +49,9 @@ class Reversi:
             exists = True
             row    += row_add
             column += column_add
+
+        if valid == False:
+            position_nums = []
 
         return position_nums
 
@@ -61,7 +65,7 @@ class Reversi:
             return position_nums
 
         column = position_num % 8
-        row    = int((position_num - column) / 8)
+        row    = int(position_num / 8)
 
         row_column_adds = ((0,1),(0,-1),(1,0),(-1,0),(1,1),(1,-1),(-1,1),(-1,-1))
         for row_add, column_add in row_column_adds:
