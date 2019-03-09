@@ -1,4 +1,4 @@
-# CLI
+# CUI
 
 ```bash
 $ docker-compose up -d --build
