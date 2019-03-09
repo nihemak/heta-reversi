@@ -1,3 +1,5 @@
+# CLI
+
 ```bash
 $ docker-compose up -d --build
 $ docker-compose exec python3 bash
@@ -76,3 +78,19 @@ $ docker-compose down
 
 * create a trained dual network with AWS Batch  
 See [Setup Batch Environment](docs/setup_batch.md).
+
+# WebUI
+
+```bash
+docker build -f Dockerfile_app -t heta-reversi-app:latest .
+docker run -d -p 5000:5000 heta-reversi-app
+```
+
+http://localhost:5000/
+
+```bash
+docker stop [CONTAINER ID]
+```
+
+* create a ECS environment  
+See [Setup APP Environment](docs/setup_app.md).
