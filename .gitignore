@@ -18,6 +18,7 @@ var/
 data/*
 .vscode
 node_modules
+__pycache__
 
 # Serverless directories
 .serverless
