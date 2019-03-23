@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Model Create AWS Batch AMI Template
+Resources:
+  ModelCreateAmiBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+                - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      RoleName: heta-reversi-model-create-ami-build
+  ModelCreateAmiBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: heta-reversi-model-create-ami
+      ServiceRole: !Ref ModelCreateAmiBuildServiceRole
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/docker:18.09.0
+        EnvironmentVariables:
+          - Name: AWS_REGION
+            Value: ap-northeast-1
+            Type: PLAINTEXT
+          - Name: AWS_SUBNET_ID
+            Value: !ImportValue heta-reversi-vpc-PublicSubnet
+            Type: PLAINTEXT
+      Source:
+        Type: CODECOMMIT
+        Location: https://git-codecommit.ap-northeast-1.amazonaws.com/v1/repos/heta-reversi
+        BuildSpec: buildspec_ami.yml
