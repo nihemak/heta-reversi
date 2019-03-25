@@ -3,3 +3,8 @@ Description: Model Create AWS Batch Template
 Parameters:
   AMI:
     Type: String
+Resources:
+  ModelCreateEcrRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: heta-reversi-model-create
