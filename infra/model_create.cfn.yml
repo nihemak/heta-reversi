@@ -8,3 +8,18 @@ Resources:
     Type: AWS::ECR::Repository
     Properties:
       RepositoryName: heta-reversi-model-create
+  ModelCreateEcrBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+                - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      RoleName: heta-reversi-model-create-ecr-build
