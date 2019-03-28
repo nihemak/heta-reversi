@@ -58,3 +58,9 @@ Resources:
       GroupName: heta-reversi-model-create-sg
       GroupDescription: heta-reversi-model-create-sg
       VpcId: !ImportValue heta-reversi-vpc-VPCID
+  ModelCreateSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ModelCreateSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref ModelCreateSecurityGroup
