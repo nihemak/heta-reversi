@@ -51,3 +51,10 @@ Resources:
         Type: CODECOMMIT
         Location: https://git-codecommit.ap-northeast-1.amazonaws.com/v1/repos/heta-reversi
         BuildSpec: buildspec_ecr.yml
+
+  ModelCreateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: heta-reversi-model-create-sg
+      GroupDescription: heta-reversi-model-create-sg
+      VpcId: !ImportValue heta-reversi-vpc-VPCID
