@@ -1,0 +1,7 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: CodeCommit Template
+Resources:
+  CodeCommitRepo:
+    Type: AWS::CodeCommit::Repository
+    Properties:
+      RepositoryName: heta-reversi

@@ -77,7 +77,7 @@ $ docker-compose down
 ```
 
 * create a trained dual network with AWS Batch  
-See [Setup Batch Environment](docs/setup_batch.md).
+See [Setup Batch Environment](docs/setup.md#user-content-setup-batch-environment).
 
 # WebUI
 
@@ -93,4 +93,4 @@ docker stop [CONTAINER ID]
 ```
 
 * create a ECS environment  
-See [Setup APP Environment](docs/setup_app.md).
+See [Setup APP Environment](docs/setup.md#user-content-setup-app-environment).

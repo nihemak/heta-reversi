@@ -1,0 +1,166 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Model Create AWS Batch Template
+Parameters:
+  AMI:
+    Type: String
+Resources:
+  ModelCreateEcrRepo:
+    Type: AWS::ECR::Repository
+    Properties:
+      RepositoryName: heta-reversi-model-create
+  ModelCreateEcrBuildServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - codebuild.amazonaws.com
+            Action:
+                - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+      RoleName: heta-reversi-model-create-ecr-build
+  ModelCreateEcrBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: heta-reversi-model-create-ecr
+      ServiceRole: !Ref ModelCreateEcrBuildServiceRole
+      Artifacts:
+        Type: NO_ARTIFACTS
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/docker:18.09.0
+        EnvironmentVariables:
+          - Name: REGION
+            Value: ap-northeast-1
+            Type: PLAINTEXT
+          - Name: IMAGE_REPO_NAME
+            Value: heta-reversi-model-create
+            Type: PLAINTEXT
+          - Name: IMAGE_TAG
+            Value: latest
+            Type: PLAINTEXT
+          - Name: ECR_REPO_URL
+            Value: !Sub ${AWS::AccountId}.dkr.ecr.ap-northeast-1.amazonaws.com/heta-reversi-model-create
+            Type: PLAINTEXT
+      Source:
+        Type: CODECOMMIT
+        Location: https://git-codecommit.ap-northeast-1.amazonaws.com/v1/repos/heta-reversi
+        BuildSpec: buildspec_ecr.yml
+
+  ModelCreateSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: heta-reversi-model-create-sg
+      GroupDescription: heta-reversi-model-create-sg
+      VpcId: !ImportValue heta-reversi-vpc-VPCID
+  ModelCreateSecurityGroupIngress:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref ModelCreateSecurityGroup
+      IpProtocol: -1
+      SourceSecurityGroupId: !Ref ModelCreateSecurityGroup
+
+  ModelCreateInstanceServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+                - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      RoleName: heta-reversi-model-create-instance
+  ModelCreateInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref ModelCreateInstanceServiceRole
+      InstanceProfileName: heta-reversi-model-create-instance
+  ModelCreateServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - batch.amazonaws.com
+            Action:
+                - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole
+      RoleName: heta-reversi-model-create-service
+  ModelCreateComputeEnv:
+    Type: AWS::Batch::ComputeEnvironment
+    Properties:
+      Type: MANAGED
+      ServiceRole: !GetAtt ModelCreateServiceRole.Arn
+      ComputeEnvironmentName: heta-reversi-model-create-compute-environment
+      ComputeResources:
+        MaxvCpus: 4
+        SecurityGroupIds:
+          - !Ref ModelCreateSecurityGroup
+        Subnets:
+          - !ImportValue heta-reversi-vpc-PublicSubnet
+        Type: EC2
+        MinvCpus: 0
+        ImageId: !Ref AMI
+        InstanceRole: !Ref ModelCreateInstanceServiceRole
+        InstanceTypes: 
+          - p2.xlarge
+        DesiredvCpus: 0
+      State: ENABLED
+  ModelCreateJobQueue:
+    Type: AWS::Batch::JobQueue
+    Properties:
+      ComputeEnvironmentOrder:
+        - ComputeEnvironment: !Ref ModelCreateComputeEnv
+          Order: 1
+      Priority: 1
+      JobQueueName: heta-reversi-model-create-job-queue
+  ModelCreateJobServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+                - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+      RoleName: heta-reversi-model-create-job
+  ModelCreateJobDefinition:
+    Type: AWS::Batch::JobDefinition
+    Properties:
+      Type: container
+      ContainerProperties:
+        Memory: 5000
+        JobRoleArn: !Ref ModelCreateJobServiceRole
+        Vcpus: 4
+        Image: !Sub ${AWS::AccountId}.dkr.ecr.ap-northeast-1.amazonaws.com/heta-reversi-model-create:latest
+      JobDefinitionName: heta-reversi-model-create-job-definition
+
+Outputs:
+  ModelCreateJobQueue:
+    Value: !Ref ModelCreateJobQueue
+    Export:
+      Name: !Sub ${AWS::StackName}-JobQueue
+  ModelCreateJobDefinition:
+    Value: !Ref ModelCreateJobDefinition
+    Export:
+      Name: !Sub ${AWS::StackName}-JobDefinition
