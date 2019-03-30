@@ -51,6 +51,11 @@ Resources:
     Properties:
       SubnetId: !Ref PublicSubnet
       RouteTableId: !Ref PublicRouteTable
+  ModelS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: test-batch-bucket-name
 Outputs:
   VPC:
     Value: !Ref VPC
