@@ -1,0 +1,86 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: App Template
+Resources:
+  AppEcsCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: heta-reversi
+  AppEcsTaskServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ecs-tasks.amazonaws.com
+            Action:
+                - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      RoleName: heta-reversi-app-ecs-task-execute
+
+  AppEcsLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /ecs/heta-reversi
+
+  AppEcsTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Cpu: 256
+      ExecutionRoleArn: !Ref AppEcsTaskServiceRole
+      Family: heta-reversi
+      Memory: 512
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      ContainerDefinitions:
+        - Cpu: 0
+          Essential: true
+          Image: !Sub ${AWS::AccountId}.dkr.ecr.ap-northeast-1.amazonaws.com/heta-reversi-app:latest
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-stream-prefix: ecs
+              awslogs-region: ap-northeast-1
+              awslogs-group: /ecs/heta-reversi
+          Name: heta-reversi
+          PortMappings:
+            - ContainerPort: 5000
+              HostPort: 5000
+              Protocol: tcp
+
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: heta-reversi-app-sg
+      GroupDescription: heta-reversi-app-sg
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 5000
+          IpProtocol: tcp
+          ToPort: 5000
+      VpcId: !ImportValue heta-reversi-vpc-VPCID
+
+  AppEcsService:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster: heta-reversi
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      DesiredCount: 1
+      LaunchType: FARGATE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !Ref AppSecurityGroup
+          Subnets:
+            - !ImportValue heta-reversi-vpc-PublicSubnet
+      PlatformVersion: LATEST
+      SchedulingStrategy: REPLICA
+      ServiceName: heta-reversi-app
+      TaskDefinition: !Ref AppEcsTaskDefinition
